@@ -18,16 +18,16 @@ struct RemoteKeyDef {
 
 inline const RemoteKeyDef *remote_key_defs(size_t *count) {
   static const RemoteKeyDef defs[] = {
-    {"up", "Remote Up", RemoteKeyGroup::DPAD, 1},
-    {"lt", "Remote Left", RemoteKeyGroup::DPAD, 3},
-    {"ok", "Remote OK", RemoteKeyGroup::DPAD, 4},
-    {"rt", "Remote Right", RemoteKeyGroup::DPAD, 5},
-    {"dn", "Remote Down", RemoteKeyGroup::DPAD, 7},
+    {"up", "Chevron Up", RemoteKeyGroup::DPAD, 1},
+    {"lt", "Chevron Left", RemoteKeyGroup::DPAD, 3},
+    {"ok", "Check", RemoteKeyGroup::DPAD, 4},
+    {"rt", "Chevron Right", RemoteKeyGroup::DPAD, 5},
+    {"dn", "Chevron Down", RemoteKeyGroup::DPAD, 7},
     {"vu", "Volume Plus", RemoteKeyGroup::VOLUME, 0},
     {"mt", "Volume Mute", RemoteKeyGroup::VOLUME, 1},
     {"vd", "Volume Minus", RemoteKeyGroup::VOLUME, 2},
     {"bk", "Remote Back", RemoteKeyGroup::ROW, 0},
-    {"hm", "Remote Home", RemoteKeyGroup::ROW, 0},
+    {"hm", "Home", RemoteKeyGroup::ROW, 0},
     {"mn", "Menu", RemoteKeyGroup::ROW, 0},
     {"rw", "Rewind", RemoteKeyGroup::ROW, 0},
     {"pp", "Play Pause", RemoteKeyGroup::ROW, 0},
@@ -147,38 +147,34 @@ inline RemoteModalGeometry remote_modal_geometry(lv_coord_t width, lv_coord_t he
   if (gap < 6) gap = 6;
   best.gap = gap;
   const int cluster_cols = (has_pad ? 3 : 0) + (has_volume ? 1 : 0);
-  const int cluster_gaps = cluster_cols > 0 ? cluster_cols - 1 + (has_pad && has_volume ? 1 : 0) : 0;
+  // Gaps inside the pad, plus the wider pad-to-volume gap used by the placement.
+  const int cluster_gaps = (has_pad ? 2 : 0) + (has_pad && has_volume ? 3 : 0);
   const int cluster_rows = cluster_cols > 0 ? 3 : 0;
 
+  // Largest key that fits `count` keys and `gaps` gaps into `space`.
+  auto key_for = [gap](lv_coord_t space, int count, int gaps) -> lv_coord_t {
+    return count > 0 ? (space - gaps * gap) / count : 32767;
+  };
   auto consider = [&](bool beside, int cols, int lines) {
-    int total_cols = cluster_cols;
-    int total_col_gaps = cluster_gaps;
-    int total_rows = cluster_rows;
-    int total_row_gaps = cluster_rows > 0 ? cluster_rows - 1 : 0;
-    if (lines > 0) {
-      if (beside) {
-        total_cols += cols;
-        total_col_gaps += (cols - 1) + (cluster_cols > 0 ? 2 : 0);
-        if (lines > total_rows) {
-          total_row_gaps = lines - 1;
-          total_rows = lines;
-        }
-      } else {
-        if (cols > total_cols) {
-          total_cols = cols;
-          total_col_gaps = cols - 1;
-        }
-        total_rows += lines;
-        total_row_gaps += (lines - 1) + (cluster_rows > 0 ? 2 : 0);
-      }
+    lv_coord_t key = 32767;
+    const bool has_cluster = cluster_cols > 0;
+    const bool has_row = lines > 0;
+    if (beside && has_cluster && has_row) {
+      key = std::min(key, key_for(width, cluster_cols + cols, cluster_gaps + 3 + (cols - 1)));
+      key = std::min(key, key_for(height, std::max(cluster_rows, lines),
+                                  std::max(cluster_rows, lines) - 1));
+    } else {
+      if (has_cluster) key = std::min(key, key_for(width, cluster_cols, cluster_gaps));
+      if (has_row) key = std::min(key, key_for(width, cols, cols - 1));
+      const int rows = (has_cluster ? cluster_rows : 0) + (has_row ? lines : 0);
+      const int row_gaps = (has_cluster ? cluster_rows - 1 : 0) + (has_row ? lines - 1 : 0) +
+                           (has_cluster && has_row ? 3 : 0);
+      key = std::min(key, key_for(height, rows, row_gaps));
     }
-    if (total_cols <= 0 || total_rows <= 0) return;
-    const lv_coord_t by_width = (width - total_col_gaps * gap) / total_cols;
-    const lv_coord_t by_height = (height - total_row_gaps * gap) / total_rows;
-    const lv_coord_t key = std::min(by_width, by_height);
+    if (key == 32767) return;
     if (key > best.key) {
       best.key = key;
-      best.row_beside = beside;
+      best.row_beside = beside && has_cluster && has_row;
       best.row_cols = cols;
       best.row_lines = lines;
     }
@@ -187,28 +183,61 @@ inline RemoteModalGeometry remote_modal_geometry(lv_coord_t width, lv_coord_t he
   if (row_count <= 0) {
     consider(false, 0, 0);
   } else {
-    for (int cols = 1; cols <= row_count; ++cols) {
+    // Widest rows first so a tie keeps the buttons on as few lines as possible.
+    for (int cols = row_count; cols >= 1; --cols) {
       const int lines = (row_count + cols - 1) / cols;
       consider(false, cols, lines);
       if (cluster_cols > 0) consider(true, cols, lines);
     }
   }
-  lv_coord_t max_key = control_modal_scaled_px(150, short_side);
+  lv_coord_t max_key = control_modal_scaled_px(120, short_side);
   if (best.key > max_key) best.key = max_key;
   if (best.key < 24) best.key = 24;
   return best;
 }
 
+struct RemoteModalPlacement {
+  lv_coord_t left = 0;
+  lv_coord_t top = 0;
+  lv_coord_t pad_w = 0;
+  lv_coord_t cluster_gap = 0;
+  lv_coord_t cluster_x = 0;
+  lv_coord_t cluster_y = 0;
+  lv_coord_t row_x = 0;
+  lv_coord_t row_y = 0;
+};
+
+inline RemoteModalPlacement remote_modal_place(
+    const RemoteModalGeometry &geometry, bool has_pad, bool has_volume,
+    lv_coord_t content_left, lv_coord_t content_top,
+    lv_coord_t content_w, lv_coord_t content_h) {
+  const lv_coord_t k = geometry.key;
+  const lv_coord_t g = geometry.gap;
+  RemoteModalPlacement placement;
+  placement.cluster_gap = g * 3;
+  placement.pad_w = has_pad ? k * 3 + g * 2 : 0;
+  const lv_coord_t volume_w = has_volume ? k : 0;
+  const lv_coord_t cluster_w = placement.pad_w + volume_w +
+    (has_pad && has_volume ? placement.cluster_gap : 0);
+  const lv_coord_t cluster_h = (has_pad || has_volume) ? k * 3 + g * 2 : 0;
+  const lv_coord_t row_w = geometry.row_cols > 0 ? k * geometry.row_cols + g * (geometry.row_cols - 1) : 0;
+  const lv_coord_t row_h = geometry.row_lines > 0 ? k * geometry.row_lines + g * (geometry.row_lines - 1) : 0;
+  const bool beside = geometry.row_beside;
+  const lv_coord_t between = (cluster_w > 0 && row_w > 0) ? placement.cluster_gap : 0;
+  const lv_coord_t total_w = beside ? cluster_w + between + row_w : std::max(cluster_w, row_w);
+  const lv_coord_t total_h = beside ? std::max(cluster_h, row_h) : cluster_h + between + row_h;
+  placement.left = content_left + (content_w - total_w) / 2;
+  placement.top = std::max<lv_coord_t>(content_top, content_top + (content_h - total_h) / 2);
+  placement.cluster_x = beside ? placement.left : placement.left + (total_w - cluster_w) / 2;
+  placement.cluster_y = beside ? placement.top + (total_h - cluster_h) / 2 : placement.top;
+  placement.row_x = beside ? placement.left + cluster_w + between : placement.left + (total_w - row_w) / 2;
+  placement.row_y = beside ? placement.top + (total_h - row_h) / 2 : placement.top + cluster_h + between;
+  return placement;
+}
+
 inline void remote_layout_modal(const ControlModalLayout &layout) {
   RemoteModalUi &ui = remote_modal_ui();
   if (!ui.panel) return;
-  lv_coord_t top_gap = control_modal_scaled_px(24, layout.short_side);
-  if (top_gap < 10) top_gap = 10;
-  const lv_coord_t content_top = layout.back_inset_y + layout.back_size + top_gap;
-  const lv_coord_t content_left = layout.inset;
-  const lv_coord_t content_w = layout.panel_w - layout.inset * 2;
-  const lv_coord_t content_h = layout.panel_h - layout.inset - content_top;
-
   bool has_pad = false, has_volume = false;
   int row_count = 0;
   for (const RemoteModalKey &key : ui.keys) {
@@ -216,44 +245,44 @@ inline void remote_layout_modal(const ControlModalLayout &layout) {
     else if (key.def->group == RemoteKeyGroup::VOLUME) has_volume = true;
     else ++row_count;
   }
-  const RemoteModalGeometry geometry = remote_modal_geometry(
-    content_w, content_h, layout.short_side, has_pad, has_volume, row_count);
+
+  // Keep the keys clear of the Back button either with equal side margins,
+  // which keeps them vertically centered, or with a strip below it. Use
+  // the strip only when the centered layout would make keys noticeably smaller.
+  lv_coord_t back_gap = control_modal_scaled_px(24, layout.short_side);
+  if (back_gap < 10) back_gap = 10;
+  const lv_coord_t back_right = layout.back_inset_x + layout.back_size + back_gap;
+  const lv_coord_t back_bottom = layout.back_inset_y + layout.back_size + back_gap;
+  const lv_coord_t side_w = layout.panel_w - back_right * 2;
+  const lv_coord_t side_h = layout.panel_h - layout.inset * 2;
+  const lv_coord_t below_w = layout.panel_w - layout.inset * 2;
+  const lv_coord_t below_h = layout.panel_h - layout.inset - back_bottom;
+  const RemoteModalGeometry side = remote_modal_geometry(
+    side_w, side_h, layout.short_side, has_pad, has_volume, row_count);
+  const RemoteModalGeometry below = remote_modal_geometry(
+    below_w, below_h, layout.short_side, has_pad, has_volume, row_count);
+  const bool use_side = side_w > 0 && side.key * 4 >= below.key * 3;
+  const RemoteModalGeometry geometry = use_side ? side : below;
+  const RemoteModalPlacement placement = use_side
+    ? remote_modal_place(geometry, has_pad, has_volume, back_right, layout.inset, side_w, side_h)
+    : remote_modal_place(geometry, has_pad, has_volume, layout.inset, back_bottom, below_w, below_h);
+
   const lv_coord_t k = geometry.key;
   const lv_coord_t g = geometry.gap;
-  const lv_coord_t cluster_gap = g * 3;
-
-  const lv_coord_t pad_w = has_pad ? k * 3 + g * 2 : 0;
-  const lv_coord_t volume_w = has_volume ? k : 0;
-  const lv_coord_t cluster_w = pad_w + volume_w + (has_pad && has_volume ? cluster_gap : 0);
-  const lv_coord_t cluster_h = (has_pad || has_volume) ? k * 3 + g * 2 : 0;
-  const lv_coord_t row_w = geometry.row_cols > 0 ? k * geometry.row_cols + g * (geometry.row_cols - 1) : 0;
-  const lv_coord_t row_h = geometry.row_lines > 0 ? k * geometry.row_lines + g * (geometry.row_lines - 1) : 0;
-  const lv_coord_t between = (cluster_w > 0 && row_w > 0) ? cluster_gap : 0;
-  const lv_coord_t total_w = geometry.row_beside ? cluster_w + between + row_w : std::max(cluster_w, row_w);
-  const lv_coord_t total_h = geometry.row_beside ? std::max(cluster_h, row_h) : cluster_h + between + row_h;
-  const lv_coord_t origin_x = content_left + (content_w - total_w) / 2;
-  lv_coord_t origin_y = content_top + (content_h - total_h) / 2;
-  if (origin_y < content_top) origin_y = content_top;
-
-  const lv_coord_t cluster_x = geometry.row_beside ? origin_x : origin_x + (total_w - cluster_w) / 2;
-  const lv_coord_t cluster_y = geometry.row_beside ? origin_y + (total_h - cluster_h) / 2 : origin_y;
-  const lv_coord_t row_x = geometry.row_beside ? origin_x + cluster_w + between : origin_x + (total_w - row_w) / 2;
-  const lv_coord_t row_y = geometry.row_beside ? origin_y + (total_h - row_h) / 2 : origin_y + cluster_h + between;
-
   int row_index = 0;
   for (RemoteModalKey &key : ui.keys) {
     if (!key.btn) continue;
     lv_coord_t x = 0, y = 0;
     if (key.def->group == RemoteKeyGroup::DPAD) {
-      x = cluster_x + (key.def->position % 3) * (k + g);
-      y = cluster_y + (key.def->position / 3) * (k + g);
+      x = placement.cluster_x + (key.def->position % 3) * (k + g);
+      y = placement.cluster_y + (key.def->position / 3) * (k + g);
     } else if (key.def->group == RemoteKeyGroup::VOLUME) {
-      x = cluster_x + pad_w + (has_pad ? cluster_gap : 0);
-      y = cluster_y + key.def->position * (k + g);
+      x = placement.cluster_x + placement.pad_w + (has_pad ? placement.cluster_gap : 0);
+      y = placement.cluster_y + key.def->position * (k + g);
     } else {
       const int cols = std::max(1, geometry.row_cols);
-      x = row_x + (row_index % cols) * (k + g);
-      y = row_y + (row_index / cols) * (k + g);
+      x = placement.row_x + (row_index % cols) * (k + g);
+      y = placement.row_y + (row_index / cols) * (k + g);
       ++row_index;
     }
     lv_obj_set_size(key.btn, k, k);
