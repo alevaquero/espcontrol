@@ -1104,6 +1104,8 @@ inline void climate_layout_card_label(lv_obj_t *label_lbl) {
   lv_obj_move_foreground(label_lbl);
 }
 
+inline const char *climate_option_icon(const std::string &kind, const std::string &value);
+
 inline void climate_update_card(ClimateControlCtx *ctx) {
   if (!ctx) return;
   std::string value = climate_card_value(ctx);
