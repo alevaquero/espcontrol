@@ -1142,12 +1142,12 @@ inline void climate_update_card(ClimateControlCtx *ctx) {
                  position == "top_right" ? LV_ALIGN_TOP_RIGHT
                  : position == "bottom_right" ? LV_ALIGN_BOTTOM_RIGHT
                  : LV_ALIGN_CENTER, 0, 0);
-    if (position == "bottom_right" && ctx->label_lbl && ctx->btn) {
-      // Keep long labels from wrapping underneath the icon.
+    if (position == "bottom_right" && ctx->label_lbl) {
+      // Keep long labels from wrapping underneath the icon. Padding, unlike a
+      // fixed width, is cleared when the slot is reused for another card.
       lv_obj_update_layout(ctx->mode_icon_lbl);
-      lv_coord_t width = lv_obj_get_content_width(ctx->btn) -
-                         lv_obj_get_width(ctx->mode_icon_lbl) - 6;
-      if (width > 0) lv_obj_set_width(ctx->label_lbl, width);
+      lv_obj_set_style_pad_right(ctx->label_lbl,
+        lv_obj_get_width(ctx->mode_icon_lbl) + 6, LV_PART_MAIN);
     }
   }
   if (ctx->btn) {
