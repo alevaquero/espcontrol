@@ -879,6 +879,11 @@ inline std::string normalize_climate_temperature_step(const std::string &value) 
   return card_runtime_climate_temperature_step(value);
 }
 
+// Where the optional HVAC mode icon sits on the card; empty means hidden.
+inline std::string normalize_climate_mode_icon(const std::string &value) {
+  return value == "center" || value == "top_right" || value == "bottom_right" ? value : "";
+}
+
 inline bool climate_card_type(const std::string &type) {
   return type == "climate" || type == "climate_control";
 }
@@ -935,9 +940,10 @@ inline std::string climate_card_options_normalized(const std::string &options,
        large_numbers_explicitly_disabled(options))) {
     append_large_numbers_option(out, options);
   }
-  if (cfg_option_token_present(options, "mode_icon")) {
+  std::string mode_icon = normalize_climate_mode_icon(cfg_option_value(options, "mode_icon"));
+  if (!mode_icon.empty()) {
     if (!out.empty()) out += ",";
-    out += "mode_icon";
+    out += "mode_icon=" + mode_icon;
   }
   if (include_control_tabs) {
     std::string tabs = normalize_climate_control_tabs_value(

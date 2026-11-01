@@ -7,7 +7,7 @@
     { "name": "number_display", "label": "Icon & Temperatures", "kind": "choice", "values": ["icon", "actual", "target"], "defaultValue": "target", "omitDefault": true },
     { "name": "temperature_step", "label": "Temperature Step", "kind": "choice", "values": ["1", "0.5"], "defaultValue": "1", "omitDefault": true },
     { "name": "large_numbers", "label": "Large Temperature Numbers", "kind": "flag", "omitDefault": true },
-    { "name": "mode_icon", "label": "Mode Icon", "kind": "flag", "omitDefault": true }
+    { "name": "mode_icon", "label": "Mode Icon", "kind": "choice", "values": ["off", "center", "top_right", "bottom_right"], "defaultValue": "off", "omitDefault": true }
   ],
   "normalization": {
     "fields": {

@@ -116,7 +116,7 @@ struct ClimateControlCtx {
   int precision = 0;
   std::string label_display = "label";
   std::string number_display = "target";
-  bool show_mode_icon = false;
+  std::string mode_icon_position;  // Empty when off, else center/top_right/bottom_right.
   // Keep reports separate while plus/minus edits wait for their debounce.
   int reported_target_tenths = CLIMATE_DEFAULT_TARGET_TENTHS;
   int reported_low_tenths = CLIMATE_DEFAULT_LOW_TENTHS;
@@ -1137,7 +1137,18 @@ inline void climate_update_card(ClimateControlCtx *ctx) {
   }
   if (ctx->mode_icon_lbl) {
     lv_label_set_display_text(ctx->mode_icon_lbl, climate_option_icon("hvac", ctx->hvac_mode));
-    lv_obj_align(ctx->mode_icon_lbl, LV_ALIGN_CENTER, 0, 0);
+    const std::string &position = ctx->mode_icon_position;
+    lv_obj_align(ctx->mode_icon_lbl,
+                 position == "top_right" ? LV_ALIGN_TOP_RIGHT
+                 : position == "bottom_right" ? LV_ALIGN_BOTTOM_RIGHT
+                 : LV_ALIGN_CENTER, 0, 0);
+    if (position == "bottom_right" && ctx->label_lbl && ctx->btn) {
+      // Keep long labels from wrapping underneath the icon.
+      lv_obj_update_layout(ctx->mode_icon_lbl);
+      lv_coord_t width = lv_obj_get_content_width(ctx->btn) -
+                         lv_obj_get_width(ctx->mode_icon_lbl) - 6;
+      if (width > 0) lv_obj_set_width(ctx->label_lbl, width);
+    }
   }
   if (ctx->btn) {
     set_card_checked_state(ctx->btn, climate_is_active(ctx));
@@ -2730,7 +2741,7 @@ inline ClimateControlCtx *create_climate_control_context(
   climate_apply_saved_range(ctx, p.precision);
   ctx->label_display = normalize_climate_label_display(cfg_option_value(p.options, "label_display"));
   ctx->number_display = normalize_climate_number_display(cfg_option_value(p.options, "number_display"));
-  ctx->show_mode_icon = cfg_option_token_present(p.options, "mode_icon");
+  ctx->mode_icon_position = normalize_climate_mode_icon(cfg_option_value(p.options, "mode_icon"));
   ctx->configured_step_tenths = normalize_climate_temperature_step(
     cfg_option_value(p.options, "temperature_step")) == "0.5"
       ? CLIMATE_DEFAULT_STEP_TENTHS
@@ -2760,7 +2771,7 @@ inline ClimateControlCtx *create_climate_control_context(
   ctx->card_icon_font = card_icon_font ? card_icon_font : icon_font;
   ctx->icon_font = icon_font;
   ctx->width_compensation_percent = normalize_width_compensation_percent(width_compensation_percent);
-  if (btn && ctx->show_mode_icon) {
+  if (btn && !ctx->mode_icon_position.empty()) {
     // A plain child of the card; the slot reset deletes it on rebuild.
     ctx->mode_icon_lbl = lv_label_create(btn);
     if (ctx->mode_icon_lbl) {

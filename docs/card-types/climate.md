@@ -24,7 +24,7 @@ A Climate card controls a Home Assistant `climate` entity, such as a thermostat,
    - **Icon** shows the selected icon instead of a large temperature. Choose separate **Off Icon** and **On Icon** values if you want the icon to change when the climate entity is on.
    - **Actual** shows the current measured temperature as the large number.
    - **Target** shows the target temperature as the large number.
-6. Turn on **Mode Icon** if you want an icon in the middle of the card showing the current HVAC mode: a flame for Heat, a snowflake for Cool, a thermostat for Heat/Cool or Auto, a water drop for Dry, a fan for Fan, and a power symbol for Off. Leave it off to keep the card as it was.
+6. Choose **Mode Icon** to add an icon showing the current HVAC mode: a flame for Heat, a snowflake for Cool, a thermostat for Heat/Cool or Auto, a water drop for Dry, a fan for Fan, and a power symbol for Off. Pick **Center**, **Top Right**, or **Bottom Right** for where it sits on the card, or **Off** to hide it.
 7. Choose **Temperature Display**:
    - **10** shows whole numbers.
    - **10.2** shows one decimal place.

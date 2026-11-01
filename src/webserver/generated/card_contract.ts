@@ -1195,7 +1195,14 @@ export const CARD_CONTRACT_CARDS: Readonly<Record<string, CardTypeSpec>> = {
       {
         "name": "mode_icon",
         "label": "Mode Icon",
-        "kind": "flag",
+        "kind": "choice",
+        "values": [
+          "off",
+          "center",
+          "top_right",
+          "bottom_right"
+        ],
+        "defaultValue": "off",
         "omitDefault": true
       }
     ],
@@ -1325,7 +1332,14 @@ export const CARD_CONTRACT_CARDS: Readonly<Record<string, CardTypeSpec>> = {
       {
         "name": "mode_icon",
         "label": "Mode Icon",
-        "kind": "flag",
+        "kind": "choice",
+        "values": [
+          "off",
+          "center",
+          "top_right",
+          "bottom_right"
+        ],
+        "defaultValue": "off",
         "omitDefault": true
       },
       {

@@ -3741,7 +3741,14 @@
           {
             "name": "mode_icon",
             "label": "Mode Icon",
-            "kind": "flag",
+            "kind": "choice",
+            "values": [
+              "off",
+              "center",
+              "top_right",
+              "bottom_right"
+            ],
+            "defaultValue": "off",
             "omitDefault": true
           }
         ],
@@ -3871,7 +3878,14 @@
           {
             "name": "mode_icon",
             "label": "Mode Icon",
-            "kind": "flag",
+            "kind": "choice",
+            "values": [
+              "off",
+              "center",
+              "top_right",
+              "bottom_right"
+            ],
+            "defaultValue": "off",
             "omitDefault": true
           },
           {
