@@ -315,6 +315,7 @@ constexpr const char *CARD_CONTRACT_OPTION_NAME_COVER_ART_SECONDARY_ENTITY = "co
 constexpr const char *CARD_CONTRACT_OPTION_NAME_COVER_MODE = "cover_mode";
 constexpr const char *CARD_CONTRACT_OPTION_NAME_COVER_POSITION = "cover_position";
 constexpr const char *CARD_CONTRACT_OPTION_NAME_COVER_TABS = "cover_tabs";
+constexpr const char *CARD_CONTRACT_OPTION_NAME_CURRENT_TEMPERATURE = "current_temperature";
 constexpr const char *CARD_CONTRACT_OPTION_NAME_DATE_TIME_MODE = "date_time_mode";
 constexpr const char *CARD_CONTRACT_OPTION_NAME_FAN_LIGHT_ENTITY = "fan_light_entity";
 constexpr const char *CARD_CONTRACT_OPTION_NAME_FAN_TABS = "fan_tabs";

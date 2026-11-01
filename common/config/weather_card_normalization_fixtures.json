@@ -163,5 +163,35 @@
       "precision": "today",
       "options": ""
     }
+  },
+  {
+    "name": "current weather keeps the temperature position",
+    "input": "weather.home;Weather;Auto;Auto;;;weather;;current_temperature=top_right,junk=1",
+    "expected": {
+      "entity": "weather.home",
+      "label": "Weather",
+      "icon": "Auto",
+      "icon_on": "Auto",
+      "sensor": "",
+      "unit": "",
+      "type": "weather",
+      "precision": "",
+      "options": "current_temperature=top_right"
+    }
+  },
+  {
+    "name": "forecast weather drops the current temperature position",
+    "input": "weather.home;Weather;Auto;Auto;;;weather;daily;current_temperature=bottom_right",
+    "expected": {
+      "entity": "weather.home",
+      "label": "Weather",
+      "icon": "Auto",
+      "icon_on": "Auto",
+      "sensor": "",
+      "unit": "",
+      "type": "weather",
+      "precision": "daily",
+      "options": ""
+    }
   }
 ]

@@ -52,13 +52,21 @@ export function createConfigWeatherOptionsFeature(
     function rainfallUsesForecast(button?: any): boolean {
         return weatherForecastCardsSupported() && !!button && button.precision === "rainfall" && configOptionValue(button.options, "rainfall_source") === "forecast";
     }
+    // Where a Current Conditions card shows the temperature; "off" hides it.
+    function weatherCurrentTemperature(button?: any): string {
+        const value = configOptionValue(button && button.options, "current_temperature");
+        return !!button && !button.precision && (value === "top_right" || value === "bottom_right") ? value : "off";
+    }
     function normalizeWeatherOptions(options?: any, button?: any): string {
+        const temperature = weatherCurrentTemperature({ ...button, options });
+        if (temperature !== "off") return "current_temperature=" + temperature;
         if (weatherWindUsesSensors({ ...button, options })) return "wind_source=sensors";
         return rainfallUsesForecast({ ...button, options }) ? "rainfall_source=forecast" : "";
     }
     return {
         weatherWindUsesSensors,
         rainfallUsesForecast,
+        weatherCurrentTemperature,
         normalizeWeatherOptions,
         weatherCardDefaultForecastLabel,
         weatherCardIsForecastMode,

@@ -535,7 +535,16 @@ inline bool rainfall_uses_forecast(const ParsedCfg &config) {
   return config.precision == "rainfall" && card_runtime_weather_forecast_supported() &&
     cfg_option_value(config.options, "rainfall_source") == "forecast";
 }
+// Where a Current Conditions card shows the temperature; empty means hidden.
+inline std::string normalize_weather_current_temperature(const std::string &value) {
+  return value == "top_right" || value == "bottom_right" ? value : "";
+}
 inline std::string weather_card_options_normalized(const std::string &options, const ParsedCfg &config) {
+  if (config.precision.empty()) {
+    const std::string position = normalize_weather_current_temperature(
+      cfg_option_value(options, "current_temperature"));
+    return position.empty() ? "" : "current_temperature=" + position;
+  }
   if (config.precision == "wind" && cfg_option_value(options, "wind_source") == "sensors") return "wind_source=sensors";
   return config.precision == "rainfall" && card_runtime_weather_forecast_supported() &&
     cfg_option_value(options, "rainfall_source") == "forecast" ? "rainfall_source=forecast" : "";
