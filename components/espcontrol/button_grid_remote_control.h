@@ -80,6 +80,7 @@ struct RemoteModalUi {
   lv_obj_t *overlay = nullptr;
   lv_obj_t *panel = nullptr;
   lv_obj_t *back_btn = nullptr;
+  lv_obj_t *volume_bar = nullptr;  // Shared pill behind the volume keys.
   std::string entity;
   uint32_t generation = 0;
   std::vector<RemoteModalKey> keys;
@@ -274,11 +275,13 @@ inline void remote_layout_modal(const ControlModalLayout &layout) {
     if (!key.btn) continue;
     lv_coord_t x = 0, y = 0;
     if (key.def->group == RemoteKeyGroup::DPAD) {
-      x = placement.cluster_x + (key.def->position % 3) * (k + g);
+      const lv_coord_t pad_x = placement.cluster_x + (has_volume ? k + placement.cluster_gap : 0);
+      x = pad_x + (key.def->position % 3) * (k + g);
       y = placement.cluster_y + (key.def->position / 3) * (k + g);
     } else if (key.def->group == RemoteKeyGroup::VOLUME) {
-      x = placement.cluster_x + placement.pad_w + (has_pad ? placement.cluster_gap : 0);
-      y = placement.cluster_y + key.def->position * (k + g);
+      // Volume keys sit inside the bar, so their position is bar-relative.
+      x = 0;
+      y = key.def->position * (k + g);
     } else {
       const int cols = std::max(1, geometry.row_cols);
       x = placement.row_x + (row_index % cols) * (k + g);
@@ -289,7 +292,49 @@ inline void remote_layout_modal(const ControlModalLayout &layout) {
     lv_obj_set_style_radius(key.btn, k / 2, LV_PART_MAIN);
     lv_obj_set_pos(key.btn, x, y);
   }
+  if (ui.volume_bar) {
+    lv_obj_set_size(ui.volume_bar, k, k * 3 + g * 2);
+    lv_obj_set_style_radius(ui.volume_bar, k / 2, LV_PART_MAIN);
+    lv_obj_set_pos(ui.volume_bar, placement.cluster_x, placement.cluster_y);
+  }
   if (ui.back_btn) lv_obj_move_foreground(ui.back_btn);
+}
+
+inline lv_obj_t *remote_create_volume_bar(lv_obj_t *panel, uint32_t surface) {
+  lv_obj_t *bar = lv_obj_create(panel);
+  if (!bar) return nullptr;
+  lv_obj_set_style_bg_color(bar, lv_color_hex(surface), LV_PART_MAIN);
+  lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, LV_PART_MAIN);
+  lv_obj_set_style_border_width(bar, 0, LV_PART_MAIN);
+  lv_obj_set_style_shadow_width(bar, 0, LV_PART_MAIN);
+  lv_obj_set_style_pad_all(bar, 0, LV_PART_MAIN);
+  lv_obj_clear_flag(bar, LV_OBJ_FLAG_SCROLLABLE);
+  apply_width_compensation(bar, icon_width_compensation_percent());
+  return bar;
+}
+
+// A transparent key inside the volume bar; pressing it tints just that part.
+inline lv_obj_t *remote_create_volume_key(lv_obj_t *bar, const char *icon) {
+  lv_obj_t *btn = lv_btn_create(bar);
+  if (!btn) return nullptr;
+  lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, LV_PART_MAIN);
+  lv_obj_set_style_border_width(btn, 0, LV_PART_MAIN);
+  lv_obj_set_style_shadow_width(btn, 0, LV_PART_MAIN);
+  lv_obj_set_style_pad_all(btn, 0, LV_PART_MAIN);
+  const lv_style_selector_t pressed =
+    static_cast<lv_style_selector_t>(LV_PART_MAIN) | static_cast<lv_style_selector_t>(LV_STATE_PRESSED);
+  lv_obj_set_style_bg_color(btn, lv_color_hex(theme_display_color(current_theme().border)), pressed);
+  lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, pressed);
+  apply_push_button_transition(btn);
+  lv_obj_clear_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_t *label = lv_label_create(btn);
+  if (label) {
+    lv_label_set_display_text(label, icon);
+    lv_obj_set_style_text_color(label, lv_color_hex(current_theme().text_primary), LV_PART_MAIN);
+    if (remote_icon_font_ref()) lv_obj_set_style_text_font(label, remote_icon_font_ref(), LV_PART_MAIN);
+    lv_obj_center(label);
+  }
+  return btn;
 }
 
 inline void remote_open_modal(const ParsedCfg &config, lv_obj_t *owner) {
@@ -328,12 +373,21 @@ inline void remote_open_modal(const ParsedCfg &config, lv_obj_t *owner) {
   }
 
   const uint32_t surface = theme_display_color(current_theme().surface_primary);
+  for (const RemoteModalKey &key : ui.keys) {
+    if (key.def->group == RemoteKeyGroup::VOLUME && !ui.volume_bar) {
+      ui.volume_bar = remote_create_volume_bar(ui.panel, surface);
+    }
+  }
   for (size_t i = 0; i < ui.keys.size(); ++i) {
     RemoteModalKey &key = ui.keys[i];
-    key.btn = control_modal_create_round_button(
-      ui.panel, 48, find_icon(key.def->icon), remote_icon_font_ref(),
-      theme_display_color(current_theme().border), surface,
-      icon_width_compensation_percent());
+    if (key.def->group == RemoteKeyGroup::VOLUME) {
+      key.btn = ui.volume_bar ? remote_create_volume_key(ui.volume_bar, find_icon(key.def->icon)) : nullptr;
+    } else {
+      key.btn = control_modal_create_round_button(
+        ui.panel, 48, find_icon(key.def->icon), remote_icon_font_ref(),
+        theme_display_color(current_theme().border), surface,
+        icon_width_compensation_percent());
+    }
     if (!key.btn) continue;
     if (std::strcmp(key.def->option, "ok") == 0) {
       lv_obj_set_style_bg_color(key.btn, lv_color_hex(DEFAULT_ACCENT_COLOR), LV_PART_MAIN);
