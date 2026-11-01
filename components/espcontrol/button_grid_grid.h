@@ -326,6 +326,8 @@ inline void grid_prepare_timer_visual_reset(lv_obj_t *owner);
 #include "button_grid_image_driver.h"
 #include "button_grid_wifi_qr.h"
 #include "button_grid_wifi_qr_driver.h"
+#include "button_grid_remote_control.h"
+#include "button_grid_remote_control_driver.h"
 #include "button_grid_light_control_driver.h"
 #include "button_grid_fan_control_driver.h"
 #include "button_grid_climate_control_driver.h"
@@ -614,6 +616,7 @@ inline void setup_card_visual(BtnSlot &s, const ParsedCfg &p,
   espcontrol::cards::navigation_driver_cleanup(s, p, context);
   espcontrol::cards::image_driver_cleanup(s, p, context);
   espcontrol::cards::wifi_qr_driver_cleanup(s, p, context);
+  espcontrol::cards::remote_control_driver_cleanup(s, p, context);
   espcontrol::cards::light_control_driver_cleanup(s, p, context);
   espcontrol::cards::fan_control_driver_cleanup(s, p, context);
   espcontrol::cards::climate_control_driver_cleanup(s, p, context);
@@ -656,6 +659,7 @@ inline void setup_card_visual(BtnSlot &s, const ParsedCfg &p,
   }
   if (espcontrol::cards::wifi_qr_driver_setup_visual(
         s, p, context, row_span, col_span)) return;
+  if (espcontrol::cards::remote_control_driver_setup_visual(s, p, context)) return;
   if (espcontrol::cards::light_control_driver_setup_visual(s, p, context)) {
     espcontrol::cards::light_control_driver_attach_interaction(s, p, context);
     espcontrol::cards::light_control_driver_refresh_layout(s, p, context);
@@ -1934,6 +1938,7 @@ inline void grid_phase2(
   set_switch_confirmation_message_font(display_switch_confirmation_message_font(display));
   set_switch_confirmation_icon_font(display_icon_font(display));
   set_wifi_qr_icon_font(display_icon_font(display));
+  set_remote_icon_font(display_icon_font(display));
   network_status_card_icon_font() = display_icon_font(display);
   set_wifi_qr_heading_font(display_media_title_font(display));
   int NS = bounded_grid_slots(cfg.num_slots);
@@ -2018,6 +2023,7 @@ inline void grid_phase2(
     if (espcontrol::cards::image_driver_bind_main(
           s, p, context, cfg, palette)) continue;
     if (espcontrol::cards::wifi_qr_driver_bind_main(s, p, context)) continue;
+    if (espcontrol::cards::remote_control_driver_bind_main(s, p, context)) continue;
     auto light_control_environment =
       espcontrol::cards::light_control_driver_environment(
         card_palette, display, s);
@@ -2252,6 +2258,8 @@ inline void grid_phase2(
       if (espcontrol::cards::image_driver_bind_subpage(
             sub_slot, sb_cfg, context, cfg, palette)) continue;
       if (espcontrol::cards::wifi_qr_driver_bind_subpage(
+            sub_slot, sb_cfg, context)) continue;
+      if (espcontrol::cards::remote_control_driver_bind_subpage(
             sub_slot, sb_cfg, context)) continue;
       auto light_control_environment =
         espcontrol::cards::light_control_driver_environment(

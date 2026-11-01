@@ -495,7 +495,7 @@ export function createConfigCodecFeature(
         var normalizedSavedSensor: any = !!(b && normalizeSavedConfigSensor(b, wasLegacyTextSensor, normalizeSavedConfigSensorFields, normalizeSensorOptions));
         var normalizedSavedOccupancy: any = !!(b && normalizeSavedConfigOccupancy(b, normalizeSavedConfigOccupancyFields, normalizeSavedConfigOccupancyOptions));
         var normalizedSavedSwitch: any = !!(b && !normalizedSavedSensor && normalizeSavedConfigSwitch(b, normalizeSwitchConfirmationOptions));
-        if (b && !normalizedSavedSensor && !normalizedSavedSwitch && !normalizedSavedAccess && !normalizedSavedOccupancy && !normalizedSavedStatic && !normalizedSavedFan && !normalizedSavedMower && b.type !== "action" && b.type !== "alarm" && b.type !== "alarm_action" && !isClimateCardType(b.type) && b.type !== "webhook" && b.type !== "media" && b.type !== "subpage" && b.type !== "image" && b.type !== "wifi_qr" && b.type !== "wifi_qr_card" && b.type !== "light_control" && b.type !== "vacuum" && b.type !== "weather" && !cardLargeNumbersSupported(b)) {
+        if (b && !normalizedSavedSensor && !normalizedSavedSwitch && !normalizedSavedAccess && !normalizedSavedOccupancy && !normalizedSavedStatic && !normalizedSavedFan && !normalizedSavedMower && b.type !== "action" && b.type !== "alarm" && b.type !== "alarm_action" && !isClimateCardType(b.type) && b.type !== "webhook" && b.type !== "media" && b.type !== "subpage" && b.type !== "image" && b.type !== "wifi_qr" && b.type !== "wifi_qr_card" && b.type !== "remote" && b.type !== "light_control" && b.type !== "vacuum" && b.type !== "weather" && !cardLargeNumbersSupported(b)) {
             b.options = "";
         }
         if (b && cardColorOptions) b.options = [b.options || "", cardColorOptions].filter(Boolean).join(",");
@@ -693,15 +693,15 @@ export function createConfigCodecFeature(
         else if (type === "image") {
             options = normalizeImageOptions(options, b && b.entity);
         }
-        else if (type === "wifi_qr" || type === "wifi_qr_card") {
-            var wifiButton: any = EspControlModel.cloneCardConfig(b || {});
-            wifiButton.options = options;
-            wifiButton.label = label;
-            wifiButton.icon = icon;
-            normalizeWithRegisteredCardType(wifiButton);
-            label = wifiButton.label;
-            icon = wifiButton.icon;
-            options = wifiButton.options;
+        else if (type === "wifi_qr" || type === "wifi_qr_card" || type === "remote") {
+            var registeredButton: any = EspControlModel.cloneCardConfig(b || {});
+            registeredButton.options = options;
+            registeredButton.label = label;
+            registeredButton.icon = icon;
+            normalizeWithRegisteredCardType(registeredButton);
+            label = registeredButton.label;
+            icon = registeredButton.icon;
+            options = registeredButton.options;
         }
         else if (type === "light_control") {
             options = normalizeLightControlOptions(options);

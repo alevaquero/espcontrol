@@ -481,6 +481,7 @@ export function createWebStyles(dragAnimation: boolean): string {
         ".sp-light-tab-row.sp-dragging .sp-light-tab-drag{cursor:grabbing}" +
         ".sp-light-tab-drag:hover,.sp-light-tab-move:hover{background:var(--surface2);color:var(--text)}" +
         ".sp-light-tab-label{min-width:0;color:var(--text);font-size:.9rem;line-height:1.25;cursor:pointer}" +
+        ".sp-remote-command{width:150px;max-width:45vw}" +
         ".sp-segment{display:flex;border-radius:var(--action-r);overflow:hidden;border:1px solid var(--border);margin-bottom:14px}" +
         ".sp-segment-scroll{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none}" +
         ".sp-segment-scroll::-webkit-scrollbar{display:none}" +

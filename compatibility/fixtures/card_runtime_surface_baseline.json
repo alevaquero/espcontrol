@@ -703,7 +703,7 @@
         },
         "preview": {
           "available": true,
-          "fingerprint": "9b48d48a5064589a"
+          "fingerprint": "eb7c9d87faa0f40b"
         }
       },
       "firmware": {
@@ -2268,6 +2268,38 @@
           "local"
         ],
         "modalOwner": "none"
+      }
+    },
+    {
+      "name": "remote: remote",
+      "sourceKind": "contract",
+      "sourceType": "remote",
+      "mode": "remote",
+      "canonicalType": "remote",
+      "web": {
+        "registration": "remote",
+        "picker": {
+          "main": true,
+          "subpage": true,
+          "infoOnly": false
+        },
+        "preview": {
+          "available": true,
+          "fingerprint": "3e9d2677b954b2e0"
+        }
+      },
+      "firmware": {
+        "family": "REMOTE"
+      },
+      "lifecycle": {
+        "subscriptions": [
+          "state"
+        ],
+        "actions": [
+          "modal",
+          "home_assistant_service"
+        ],
+        "modalOwner": "remote"
       }
     },
     {

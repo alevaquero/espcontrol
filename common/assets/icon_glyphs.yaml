@@ -28,6 +28,12 @@
 - "\U000F0042"  # mdi-arrow-bottom-left
 - "\U000F004D"  # mdi-arrow-left
 - "\U000F005B"  # mdi-arrow-top-left
+- "\U000F075D"  # mdi-volume-plus (Remote card modal button)
+- "\U000F075E"  # mdi-volume-minus (Remote card modal button)
+- "\U000F075F"  # mdi-volume-mute (Remote card modal button)
+- "\U000F035C"  # mdi-menu (Remote card modal button)
+- "\U000F045F"  # mdi-rewind (Remote card modal button)
+- "\U000F0211"  # mdi-fast-forward (Remote card modal button)
 - "\U000F0141"  # mdi-chevron-left
 - "\U000F0142"  # mdi-chevron-right
 - "\U000F0004"  # mdi-account

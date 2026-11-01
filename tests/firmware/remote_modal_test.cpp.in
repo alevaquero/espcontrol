@@ -128,6 +128,8 @@ OPEN(weather_daily_open_modal, WEATHER_FORECAST)
 size_t weather_daily_selected_day(const Runtime &card) { return card.selected_day; }
 Runtime *weather_daily_card_for(lv_obj_t *button) { return button ? button->runtime : nullptr; }
 void wifi_qr_open_modal(const ParsedCfg &, lv_obj_t *) { show(nullptr, ControlModalKind::WIFI_QR); }
+void remote_open_modal(const ParsedCfg &, lv_obj_t *) { show(nullptr, ControlModalKind::REMOTE_CONTROL); }
+bool remote_card_has_commands(const ParsedCfg &config) { return config.options == "valid"; }
 // Any accidental re-use of a command/click path must fail these tests.
 void handle_button_click(const std::string &, int, lv_obj_t *) { ++commands; }
 void send_toggle_action(const std::string &) { ++commands; }
@@ -195,6 +197,7 @@ int main() {
     {"alarm", "", "alarm_control_panel.office", ControlModalKind::ALARM_CONTROL},
     {"option_select", "", "select.office", ControlModalKind::OPTION_SELECT},
     {"wifi_qr", "", "switch.guest", ControlModalKind::WIFI_QR},
+    {"remote", "", "remote.living_room", ControlModalKind::REMOTE_CONTROL},
   };
   {
     Runtime runtime; runtime.entity_id = "weather.home";
@@ -237,7 +240,8 @@ int main() {
       assert(!espcontrol_open_modal(test.entity, true));
       ha_connected = true;
     }
-    if (test.kind != ControlModalKind::WIFI_QR) {
+    if (test.kind != ControlModalKind::WIFI_QR &&
+        test.kind != ControlModalKind::REMOTE_CONTROL) {
       const int old_opens = opens, old_closes = closes;
       runtime.available = false; runtime.image_ready = false;
       assert(!espcontrol_open_modal(test.entity, true));
@@ -265,7 +269,8 @@ int main() {
       assert(espcontrol_open_modal(test.entity, true));
       runtime.image_ready = true; runtime.source_url.clear();
     }
-    if (test.kind == ControlModalKind::WIFI_QR) {
+    if (test.kind == ControlModalKind::WIFI_QR ||
+        test.kind == ControlModalKind::REMOTE_CONTROL) {
       configs["test"].options = "invalid";
       const int old_closes = closes;
       assert(!espcontrol_open_modal(test.entity, true) && closes == old_closes);
