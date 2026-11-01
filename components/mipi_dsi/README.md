@@ -24,8 +24,8 @@ Two additional fixes address issue #2118:
 
 Panel initialization sequences, models and saved user settings are unchanged.
 
-The JC8012P4A1 V3 and JC4880P443 V3 profiles, plus the separate 10.1-inch
-V3 test package, load this external component; other devices continue to use ESPHome's bundled driver.
+The JC8012P4A1 V3, JC4880P443 V3 and Waveshare ESP32-P4-WIFI6-Touch-LCD-5
+profiles, plus the separate 10.1-inch V3 test package, load this external component; other devices continue to use ESPHome's bundled driver.
 Keep the copy pinned to the tested ESPHome version and remove it when the
 upstream fixes are available.
 

@@ -400,6 +400,9 @@ inline Layout cover_art_layout(const std::string &slug, const std::string &rotat
       slug == "guition-esp32-p4-jc8012p4a1-v3") return landscape
     ? Layout{1280,800,0,0,800,800,0,480,800,840,40,400,720,515,0,true,5}
     : Layout{800,1280,0,0,800,0,800,800,480,40,834,720,422,216,0,true};
+  if (slug == "esp32-p4-wifi6-touch-lcd-5") return landscape
+    ? Layout{1280,720,0,0,720,720,0,560,720,760,36,480,648,463,0,true,5}
+    : Layout{720,1280,0,0,720,0,720,720,560,40,754,640,490,250,0,true};
   art_size = std::max(1, std::min(art_size, std::min(screen_width, screen_height)));
   int x = std::max(0, (screen_width - art_size) / 2), y = std::max(0, (screen_height - art_size) / 2);
   const int title_max_lines = slug == "guition-esp32-s3-4848s040" || slug == "esp32-p4-86" ? 3 : 0;

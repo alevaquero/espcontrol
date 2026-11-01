@@ -1,0 +1,422 @@
+# =============================================================================
+# DEVICE - Waveshare ESP32-P4-WIFI6-Touch-LCD-5 hardware definition
+# =============================================================================
+# Pin assignments, peripherals, and platform config for the 5" touch panel.
+# Includes the ESP32-P4 main SoC, ESP32-C6 hosted WiFi co-processor, HX8394
+# MIPI DSI display, GT911 capacitive touchscreen, ES8311 speaker output, and
+# backlight PWM.
+# =============================================================================
+
+substitutions:
+  espcontrol_component_url: "https://github.com/jtenniswood/espcontrol"
+  espcontrol_component_ref: "main"
+  mdi_font_file: "https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/fonts/materialdesignicons-webfont.ttf"
+
+# ---------------------------------------------------------------------------
+# ESP32-P4 platform (32MB flash, ESP-IDF framework)
+# ---------------------------------------------------------------------------
+esp32:
+  variant: esp32p4
+  # Waveshare documents this board with 32MB external NOR flash.
+  flash_size: 32MB
+  cpu_frequency: 360MHZ
+  # Waveshare targets this board at ESP32-P4 v3.x production silicon.
+  engineering_sample: false
+  framework:
+    type: esp-idf
+    # stick to recommended version, currently 5.5.4, 55.03.39 with tool-esptoolpy 5.3.0. No issues
+    #version: 5.5.2
+    # pioarduino 55.03.38-1 pulls tool-esptoolpy 5.2.0, which can install
+    # incompletely in ESPHome containers and then fail while creating .bin files.
+    #platform_version: 55.03.37
+    advanced:
+      enable_idf_experimental_features: true
+      execute_from_psram: true
+      disable_vfs_support_termios: false
+      disable_vfs_support_select: false
+      disable_vfs_support_dir: false
+    sdkconfig_options:
+      CONFIG_SDMMC_HOST_DEFAULT: "y"
+      # ESPHome needs 18 sockets for this panel's API, web, diagnostics, and
+      # artwork services. Keep two spare so short-lived HTTP requests do not
+      # displace Home Assistant or remote connections.
+      CONFIG_LWIP_MAX_SOCKETS: "20"
+      # HTTPS firmware checks need more stack on ESP32-P4; the default main
+      # task stack can trip the stack protector during mbedTLS setup.
+      CONFIG_ESP_MAIN_TASK_STACK_SIZE: "8192"
+      CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC: "y"
+      # Native OTA and display startup can block loopTask briefly on this
+      # panel. Use the ESP-IDF maximum so those longer operations can finish.
+      CONFIG_ESP_TASK_WDT_TIMEOUT_S: "60"
+      # ESPHome 2026.5 / ESP-IDF 5.5.2 can make ESP-Hosted preallocate a
+      # large internal DMA buffer pool before ESPHome starts. On P4 display
+      # builds this can fail with "HS_MP: mempool create failed: no mem" and
+      # trigger OTA rollback, so use dynamic buffers and keep hosted task
+      # stacks in PSRAM.
+      CONFIG_ESP_HOSTED_USE_MEMPOOL: "n"
+      CONFIG_ESP_HOSTED_DFLT_TASK_FROM_SPIRAM: "y"
+      # Stream C6 receive data through bounded queues, limiting inbound web
+      # traffic bursts on the P4's hosted-SDIO transport.
+      CONFIG_ESP_HOSTED_SDIO_OPTIMIZATION_RX_STREAMING_MODE: "y"
+      CONFIG_ESP_HOSTED_SDIO_TX_Q_SIZE: "10"
+      CONFIG_ESP_HOSTED_SDIO_RX_Q_SIZE: "10"
+      # The hosted WiFi link shares scarce internal/DMA memory with the
+      # speaker path. Keep network buffers in PSRAM and bursts small.
+      CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP: "y"
+      CONFIG_FREERTOS_THREAD_LOCAL_STORAGE_POINTERS: "1"
+      CONFIG_LOG_DEFAULT_LEVEL: "2"
+
+# ---------------------------------------------------------------------------
+# External components
+# ---------------------------------------------------------------------------
+external_components:
+  - source:
+      type: git
+      url: ${espcontrol_component_url}
+      ref: ${espcontrol_component_ref}
+      path: components
+    # Production P4 needs the silicon-aware DSI clock selection.
+    components: [espcontrol, captive_portal, web_server_idf, artwork_image, mipi_dsi]
+    refresh: 1s
+
+espcontrol:
+  id: espcontrol_app
+  panel_config:
+    device_profile: ${device_slug}
+    storage: card_images
+    button_order: button_order
+    button_on_color: button_on_color
+    buttons:
+      - config: button_1_config
+        subpage_chunks: [subpage_1_config, subpage_1_config_ext, subpage_1_config_ext_2, subpage_1_config_ext_3, subpage_1_config_ext_4, subpage_1_config_ext_5, subpage_1_config_ext_6, subpage_1_config_ext_7]
+      - config: button_2_config
+        subpage_chunks: [subpage_2_config, subpage_2_config_ext, subpage_2_config_ext_2, subpage_2_config_ext_3, subpage_2_config_ext_4, subpage_2_config_ext_5, subpage_2_config_ext_6, subpage_2_config_ext_7]
+      - config: button_3_config
+        subpage_chunks: [subpage_3_config, subpage_3_config_ext, subpage_3_config_ext_2, subpage_3_config_ext_3, subpage_3_config_ext_4, subpage_3_config_ext_5, subpage_3_config_ext_6, subpage_3_config_ext_7]
+      - config: button_4_config
+        subpage_chunks: [subpage_4_config, subpage_4_config_ext, subpage_4_config_ext_2, subpage_4_config_ext_3, subpage_4_config_ext_4, subpage_4_config_ext_5, subpage_4_config_ext_6, subpage_4_config_ext_7]
+      - config: button_5_config
+        subpage_chunks: [subpage_5_config, subpage_5_config_ext, subpage_5_config_ext_2, subpage_5_config_ext_3, subpage_5_config_ext_4, subpage_5_config_ext_5, subpage_5_config_ext_6, subpage_5_config_ext_7]
+      - config: button_6_config
+        subpage_chunks: [subpage_6_config, subpage_6_config_ext, subpage_6_config_ext_2, subpage_6_config_ext_3, subpage_6_config_ext_4, subpage_6_config_ext_5, subpage_6_config_ext_6, subpage_6_config_ext_7]
+      - config: button_7_config
+        subpage_chunks: [subpage_7_config, subpage_7_config_ext, subpage_7_config_ext_2, subpage_7_config_ext_3, subpage_7_config_ext_4, subpage_7_config_ext_5, subpage_7_config_ext_6, subpage_7_config_ext_7]
+      - config: button_8_config
+        subpage_chunks: [subpage_8_config, subpage_8_config_ext, subpage_8_config_ext_2, subpage_8_config_ext_3, subpage_8_config_ext_4, subpage_8_config_ext_5, subpage_8_config_ext_6, subpage_8_config_ext_7]
+      - config: button_9_config
+        subpage_chunks: [subpage_9_config, subpage_9_config_ext, subpage_9_config_ext_2, subpage_9_config_ext_3, subpage_9_config_ext_4, subpage_9_config_ext_5, subpage_9_config_ext_6, subpage_9_config_ext_7]
+      - config: button_10_config
+        subpage_chunks: [subpage_10_config, subpage_10_config_ext, subpage_10_config_ext_2, subpage_10_config_ext_3, subpage_10_config_ext_4, subpage_10_config_ext_5, subpage_10_config_ext_6, subpage_10_config_ext_7]
+      - config: button_11_config
+        subpage_chunks: [subpage_11_config, subpage_11_config_ext, subpage_11_config_ext_2, subpage_11_config_ext_3, subpage_11_config_ext_4, subpage_11_config_ext_5, subpage_11_config_ext_6, subpage_11_config_ext_7]
+      - config: button_12_config
+        subpage_chunks: [subpage_12_config, subpage_12_config_ext, subpage_12_config_ext_2, subpage_12_config_ext_3, subpage_12_config_ext_4, subpage_12_config_ext_5, subpage_12_config_ext_6, subpage_12_config_ext_7]
+      - config: button_13_config
+        subpage_chunks: [subpage_13_config, subpage_13_config_ext, subpage_13_config_ext_2, subpage_13_config_ext_3, subpage_13_config_ext_4, subpage_13_config_ext_5, subpage_13_config_ext_6, subpage_13_config_ext_7]
+      - config: button_14_config
+        subpage_chunks: [subpage_14_config, subpage_14_config_ext, subpage_14_config_ext_2, subpage_14_config_ext_3, subpage_14_config_ext_4, subpage_14_config_ext_5, subpage_14_config_ext_6, subpage_14_config_ext_7]
+      - config: button_15_config
+        subpage_chunks: [subpage_15_config, subpage_15_config_ext, subpage_15_config_ext_2, subpage_15_config_ext_3, subpage_15_config_ext_4, subpage_15_config_ext_5, subpage_15_config_ext_6, subpage_15_config_ext_7]
+# ---------------------------------------------------------------------------
+# ESPHome core (device name from substitutions)
+# ---------------------------------------------------------------------------
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  build_flags:
+    - "-Wno-deprecated-declarations"
+    # Force cached ESPHome objects to rebuild after the 2026.5
+    # core/scheduler/watchdog changes; stale 2026.4 objects can boot-loop.
+    - "-DESPCONTROL_ESPHOME_2026_5_REBUILD=1"
+    # Keep the ESP-IDF header warning suppressed without warning on C sources.
+    - "-Wno-literal-suffix"
+    - "-Wno-complain-wrong-lang"
+  on_boot:
+    - priority: -100
+      then:
+        - lambda: 'id(screen_rotation_ready) = true;'
+        - script.execute: apply_screen_rotation
+
+# ---------------------------------------------------------------------------
+# ESP32-C6 co-processor (provides WiFi/BLE via SDIO)
+# ---------------------------------------------------------------------------
+esp32_hosted:
+  variant: esp32c6
+  # Keep the preallocated transport receive buffers for reliable inbound
+  # connections, but place them in PSRAM to protect scarce internal memory.
+  use_psram: true
+  reset_pin: GPIO54
+  cmd_pin: GPIO19
+  clk_pin: GPIO18
+  d0_pin: GPIO14
+  d1_pin: GPIO15
+  d2_pin: GPIO16
+  d3_pin: GPIO17
+  active_high: true
+  # Matches the Waveshare ESP32-P4 86 Panel, which shares this C6 SDIO link
+  # with the same ES8311 speaker path.
+  sdio_frequency: 20MHz
+
+# ---------------------------------------------------------------------------
+# PSRAM (video frame buffer memory)
+# ---------------------------------------------------------------------------
+psram:
+  mode: hex
+  speed: 200MHz
+
+# ---------------------------------------------------------------------------
+# OTA updates (ESPHome native + HTTP-based)
+# ---------------------------------------------------------------------------
+ota:
+  - platform: esphome
+    on_begin:
+      then:
+        - script.execute: show_update_writing
+        - script.wait: show_update_writing
+    on_end:
+      then:
+        - globals.set:
+            id: firmware_update_complete_pending
+            value: 'true'
+        - lambda: 'global_preferences->sync();'
+    on_error:
+      then:
+        - script.execute: show_update_failed
+  - platform: http_request
+    on_begin:
+      then:
+        - script.execute: show_update_writing
+        - script.wait: show_update_writing
+    on_end:
+      then:
+        - globals.set:
+            id: firmware_update_complete_pending
+            value: 'true'
+        - lambda: 'global_preferences->sync();'
+    on_error:
+      then:
+        - script.execute: show_update_failed
+
+# ---------------------------------------------------------------------------
+# Shared infrastructure (API, logging, web server, restart button)
+# ---------------------------------------------------------------------------
+packages:
+  core_infra: !include ../../../common/device/core_infra.yaml
+
+# The UART USB-C port is exposed through a USB-UART bridge.
+# ESPHome defaults ESP32-P4 logging to USB_SERIAL_JTAG, which leaves this port
+# showing only early ROM boot text and no application logs.
+logger:
+  hardware_uart: UART0
+  logs:
+    speaker_source_media_player: DEBUG
+
+# ---------------------------------------------------------------------------
+# Power management (LDO channel for DSI PHY)
+# ---------------------------------------------------------------------------
+esp_ldo:
+  - channel: 3
+    id: dsi_phy_enable
+    voltage: 2.5V
+    adjustable: True
+
+# ---------------------------------------------------------------------------
+# Backlight (LEDC PWM output + monochromatic light entity)
+# ---------------------------------------------------------------------------
+output:
+  - platform: ledc
+    pin: GPIO26
+    id: gpio_backlight_pwm
+    # The Waveshare BSP drives the AC-coupled backlight path with 5 kHz PWM.
+    frequency: 5000Hz
+
+light:
+  - platform: monochromatic
+    output: gpio_backlight_pwm
+    name: Display Backlight
+    icon: mdi:lightbulb-on
+    id: display_backlight
+    restore_mode: RESTORE_DEFAULT_ON
+    default_transition_length: 0s
+    gamma_correct: 1.0
+    on_turn_on:
+      then:
+        - if:
+            condition:
+              lambda: |-
+                auto now = panel_time_or_fallback(id(panel_time).now(), id(homeassistant_time).now());
+                return (id(espcontrol_app).display().target_source_is(
+                            espcontrol::DisplayRequestSource::SCREEN_SCHEDULE) &&
+                        id(espcontrol_app).display().target_mode_is(
+                            espcontrol::DisplayMode::DISPLAY_OFF)) ||
+                       screen_schedule_waiting_for_time(
+                         id(screen_schedule_trigger).state,
+                         id(schedule_enabled).state,
+                         now.is_valid());
+            then:
+              - script.execute: backlight_force_display_off
+            else:
+              - if:
+                  condition:
+                    lambda: |-
+                      return id(espcontrol_app).display().current_mode_is(
+                          espcontrol::DisplayMode::DISPLAY_OFF);
+                  then:
+                    - script.execute: screensaver_wake
+    on_turn_off:
+      then:
+        - if:
+            condition:
+              lambda: |-
+                return id(espcontrol_app).display().takeover_active(
+                           espcontrol::DisplayTakeoverKind::INTERACTIVE) ||
+                       id(espcontrol_app).display().takeover_active(
+                           espcontrol::DisplayTakeoverKind::CRITICAL);
+            then:
+              - lambda: 'ESP_LOGD("backlight", "Restoring backlight after OFF event during display takeover");'
+              - delay: 10ms
+              - script.execute: backlight_apply_brightness
+            else:
+              - script.execute: display_backlight_handle_off
+    on_state:
+      then:
+        - script.execute: display_backlight_handle_state
+
+# ---------------------------------------------------------------------------
+# I2C bus and touchscreen (GT911 capacitive, wakes screensaver on touch)
+# ---------------------------------------------------------------------------
+i2c:
+  - id: bus_a
+    sda: GPIO07
+    scl: GPIO08
+    frequency: 400kHz
+    sda_pullup_enabled: False
+    scl_pullup_enabled: False
+
+touchscreen:
+  - platform: gt911
+    id: my_touchscreen
+    display: my_display
+    i2c_id: bus_a
+    # TP_RST is routed to GPIO23; TP_INT is not fitted by default.
+    reset_pin: GPIO23
+    on_touch:
+      - script.execute: cover_art_handle_touch
+
+# ---------------------------------------------------------------------------
+# Display (5" 720x1280 native HX8394 MIPI DSI panel)
+# ---------------------------------------------------------------------------
+# Timing and init sequence match Waveshare's esp_lcd_hx8394 driver
+# (HX8394_720_1280_PANEL_30HZ_DPI_CONFIG): 2 lanes at 700Mbps, 58MHz DPI.
+display:
+  - platform: mipi_dsi
+    id: my_display
+    model: CUSTOM
+    color_order: RGB
+    pixel_mode: 16bit
+    pclk_frequency: 58MHz
+    lanes: 2
+    lane_bit_rate: 700Mbps
+    hsync_pulse_width: 20
+    hsync_back_porch: 20
+    hsync_front_porch: 40
+    vsync_pulse_width: 4
+    vsync_back_porch: 10
+    vsync_front_porch: 24
+    # The HX8394 reset line is active high on this board.
+    reset_pin:
+      number: GPIO27
+      inverted: true
+    update_interval: never
+    auto_clear_enabled: false
+    dimensions:
+      width: 720
+      height: 1280
+    init_sequence:
+      - [0x11]
+      - delay 120ms
+      - [0xBA, 0x61]
+      - [0xB9, 0xFF, 0x83, 0x94]
+      - [0xB1, 0x48, 0x0A, 0x6A, 0x09, 0x33, 0x54, 0x71, 0x71, 0x2E, 0x45]
+      - [0xBA, 0x61, 0x03, 0x68, 0x6B, 0xB2, 0xC0]
+      - [0xB2, 0x00, 0x80, 0x64, 0x0C, 0x06, 0x2F]
+      - [0xB4, 0x1C, 0x78, 0x1C, 0x78, 0x1C, 0x78, 0x01, 0x0C, 0x86, 0x75, 0x00, 0x3F, 0x1C, 0x78, 0x1C, 0x78, 0x1C, 0x78, 0x01, 0x0C, 0x86]
+      - [0xD3, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x08, 0x32, 0x10, 0x05, 0x00, 0x05, 0x32, 0x13, 0xC1, 0x00, 0x01, 0x32, 0x10, 0x08, 0x00, 0x00, 0x37, 0x03, 0x07, 0x07, 0x37, 0x05, 0x05, 0x37, 0x0C, 0x40]
+      - [0xD5, 0x18, 0x18, 0x18, 0x18, 0x22, 0x23, 0x20, 0x21, 0x04, 0x05, 0x06, 0x07, 0x00, 0x01, 0x02, 0x03, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x19, 0x19, 0x19, 0x19]
+      - [0xD6, 0x18, 0x18, 0x19, 0x19, 0x21, 0x20, 0x23, 0x22, 0x03, 0x02, 0x01, 0x00, 0x07, 0x06, 0x05, 0x04, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x19, 0x19, 0x18, 0x18]
+      - [0xE0, 0x07, 0x08, 0x09, 0x0D, 0x10, 0x14, 0x16, 0x13, 0x24, 0x36, 0x48, 0x4A, 0x58, 0x6F, 0x76, 0x80, 0x97, 0xA5, 0xA8, 0xB5, 0xC6, 0x62, 0x63, 0x68, 0x6F, 0x72, 0x78, 0x7F, 0x7F, 0x00, 0x02, 0x08, 0x0D, 0x0C, 0x0E, 0x0F, 0x10, 0x24, 0x36, 0x48, 0x4A, 0x58, 0x6F, 0x78, 0x82, 0x99, 0xA4, 0xA0, 0xB1, 0xC0, 0x5E, 0x5E, 0x64, 0x6B, 0x6C, 0x73, 0x7F, 0x7F]
+      - [0xCC, 0x0B]
+      - [0xC0, 0x1F, 0x73]
+      - [0xB6, 0x6B, 0x6B]
+      - [0xD4, 0x02]
+      - [0xBD, 0x01]
+      - [0xB1, 0x00]
+      - [0xBD, 0x00]
+      - [0xBF, 0x40, 0x81, 0x50, 0x00, 0x1A, 0xFC, 0x01]
+      - [0x11]
+      - delay 200ms
+      - [0xB2, 0x00, 0x80, 0x64, 0x0C, 0x06, 0x2F, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x18]
+
+# ---------------------------------------------------------------------------
+# LVGL base (display binding, must be before any page definitions)
+# ---------------------------------------------------------------------------
+lvgl:
+  id: main_lvgl
+  displays: my_display
+  rotation: 90
+  byte_order: little_endian
+  touchscreens:
+    - touchscreen_id: my_touchscreen
+      long_press_time: 3s
+
+script:
+  # The panel is natively portrait, so option "0" shows the 1280x720
+  # landscape layout and "90"/"270" show the portrait layout.
+  - id: apply_screen_rotation
+    then:
+      - if:
+          condition:
+            lambda: 'return id(screen_rotation_select).current_option() == "90";'
+          then:
+            - lvgl.display.set_rotation: 180
+          else:
+            - if:
+                condition:
+                  lambda: 'return id(screen_rotation_select).current_option() == "180";'
+                then:
+                  - lvgl.display.set_rotation: 270
+                else:
+                  - if:
+                      condition:
+                        lambda: 'return id(screen_rotation_select).current_option() == "270";'
+                      then:
+                        - lvgl.display.set_rotation: 0
+                      else:
+                        - lvgl.display.set_rotation: 90
+      - script.execute: cover_art_apply_responsive_layout
+      - script.execute: camera_screensaver_request_image
+
+select:
+  - platform: template
+    name: "${entity_screen_rotation}"
+    internal: true
+    disabled_by_default: true
+    id: screen_rotation_select
+    entity_category: config
+    icon: "mdi:screen-rotation"
+    optimistic: true
+    restore_value: true
+    initial_option: "0"
+    options:
+      - "0"
+      - "90"
+      - "180"
+      - "270"
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(screen_rotation_ready);'
+            then:
+              - script.execute: apply_screen_rotation
+              - script.execute: refresh_button_grid

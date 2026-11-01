@@ -194,6 +194,30 @@
       "subpages": true
     },
     {
+      "slug": "esp32-p4-wifi6-touch-lcd-5",
+      "installSlug": "esp32-p4-wifi6-touch-lcd-5",
+      "name": "Waveshare ESP32-P4-WIFI6-Touch-LCD-5",
+      "docsPath": "/screens/p4-touch-lcd-5",
+      "screenSize": "5 inches",
+      "resolution": "1280 x 720",
+      "orientation": "Landscape",
+      "slots": 15,
+      "imageSlots": 6,
+      "imageCardTypes": [
+        "image",
+        "media_cover_art"
+      ],
+      "grid": {
+        "rows": 3,
+        "cols": 5
+      },
+      "chipFamily": "ESP32-P4",
+      "relays": 0,
+      "rotation": true,
+      "ethernetManualInstall": false,
+      "subpages": true
+    },
+    {
       "slug": "guition-esp32-s3-4848s040",
       "installSlug": "guition-esp32-s3-4848s040",
       "name": "Guition 4848S040",

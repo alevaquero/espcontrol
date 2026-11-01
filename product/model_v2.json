@@ -99,6 +99,7 @@
       "guition-esp32-p4-jc4880p443": "product/v2/devices/guition-esp32-p4-jc4880p443.json",
       "guition-esp32-p4-jc4880p443-v3": "product/v2/devices/guition-esp32-p4-jc4880p443-v3.json",
       "esp32-p4-86": "product/v2/devices/esp32-p4-86.json",
+      "esp32-p4-wifi6-touch-lcd-5": "product/v2/devices/esp32-p4-wifi6-touch-lcd-5.json",
       "guition-esp32-s3-4848s040": "product/v2/devices/guition-esp32-s3-4848s040.json"
     }
   }

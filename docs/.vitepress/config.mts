@@ -156,6 +156,14 @@ const screenProducts: Record<string, Record<string, string>> = {
     resolution: '1280 x 800',
     processor: 'ESP32-P4',
   },
+  'screens/p4-touch-lcd-5.md': {
+    name: 'Waveshare ESP32-P4-WIFI6-Touch-LCD-5',
+    brand: 'Waveshare',
+    model: 'ESP32-P4-WIFI6-Touch-LCD-5',
+    size: '5 inches',
+    resolution: '1280 x 720',
+    processor: 'ESP32-P4',
+  },
   'screens/p4-86.md': {
     name: 'ESP32-P4 86',
     brand: 'Waveshare',
@@ -366,6 +374,7 @@ export default defineConfig({
               { text: 'V3', link: '/screens/jc4880p443-v3' },
             ],
           },
+          { text: '5-inch Waveshare P4 Touch LCD 5', link: '/screens/p4-touch-lcd-5' },
           { text: '4-inch ESP32-P4 86', link: '/screens/p4-86' },
           { text: '4-inch 4848S040', link: '/screens/4848s040' },
           { text: 'Printable Stands', link: '/reference/3d-printable-stands' },

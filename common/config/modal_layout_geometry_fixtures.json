@@ -110,6 +110,28 @@
         "tabs": {"size": 48, "selectedSize": 54, "gap": 12, "frameWidth": 306, "frameHeight": 66, "safeLeft": 73, "rowLeft": 82, "contentGap": 16, "iconZoom": 180},
         "content": {"top": 100, "bottom": 418, "width": 434, "height": 318, "centerY": 41}
       }
+    },
+    {
+      "slug": "esp32-p4-wifi6-touch-lcd-5",
+      "profile": {
+        "family": "wide-landscape",
+        "density": "comfortable",
+        "memoryTier": "standard",
+        "baseTouchTarget": 57
+      },
+      "viewport": {"width": 1280, "height": 720},
+      "panelInsets": {"left": 5, "top": 46, "right": 5, "bottom": 5},
+      "expected": {
+        "panel": {"x": 5, "y": 46, "width": 1270, "height": 669},
+        "shortSide": 720,
+        "inset": 27,
+        "back": {"size": 69, "x": 27, "y": 27},
+        "buttonSize": 120,
+        "arc": {"size": 573, "stroke": 25, "centerX": 0},
+        "controlsCenterY": 232,
+        "tabs": {"size": 81, "selectedSize": 91, "gap": 20, "frameWidth": 517, "frameHeight": 113, "safeLeft": 109, "rowLeft": 376, "contentGap": 42, "iconZoom": 180},
+        "content": {"top": 182, "bottom": 642, "width": 1216, "height": 460, "centerY": 78}
+      }
     }
   ]
 }

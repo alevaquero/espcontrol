@@ -63,6 +63,8 @@ export const redirects: Record<string, string> = {
   'generated/screens/jc8012p4a1-v3-install': `${hostname}screens/jc8012p4a1-v3#install`,
   'generated/screens/p4-86-grid': `${hostname}screens/p4-86#card-grid`,
   'generated/screens/p4-86-install': `${hostname}screens/p4-86#install`,
+  'generated/screens/p4-touch-lcd-5-grid': `${hostname}screens/p4-touch-lcd-5#card-grid`,
+  'generated/screens/p4-touch-lcd-5-install': `${hostname}screens/p4-touch-lcd-5#install`,
 }
 
 // Keep section bookmarks, including guides whose sections move to different pages.

@@ -208,6 +208,26 @@ const devices = [
     ]
   },
   {
+    slug: 'esp32-p4-wifi6-touch-lcd-5',
+    name: 'ESP32-P4-WIFI6-Touch-LCD-5',
+    size: '5 inch P4',
+    resolution: '1280 x 720',
+    orientation: 'Landscape',
+    slots: 15,
+    cols: 5,
+    rows: 3,
+    aspect: '1280 / 720',
+    shape: 'landscape',
+    versions: [
+      {
+        slug: 'esp32-p4-wifi6-touch-lcd-5',
+        number: 3,
+        label: 'V3 — Production silicon',
+        revision: 'ESP32-P4 v3.x silicon'
+      }
+    ]
+  },
+  {
     slug: 'guition-esp32-s3-4848s040',
     name: '4848S040',
     size: '4 inch S3',

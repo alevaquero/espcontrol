@@ -250,6 +250,7 @@ def check_build(dist):
         'jc8012p4a1-v2': ('jc8012p4a1', 'jc8012p4a1-v2'),
         'jc8012p4a1-v3': ('jc8012p4a1', 'jc8012p4a1-v3'),
         'p4-86': ('p4-86#card-grid', 'p4-86'),
+        'p4-touch-lcd-5': ('p4-touch-lcd-5#card-grid', 'p4-touch-lcd-5'),
     }
     for model, (grid, install) in screen_guides.items():
         redirects[f'generated/screens/{model}-grid'] = BASE + 'screens/' + grid

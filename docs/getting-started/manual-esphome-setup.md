@@ -34,6 +34,7 @@ Each screen uses a different ESPHome package file. For the JC8012P4A1, confirm E
 | 4.3-inch JC4880P443 original | `devices/guition-esp32-p4-jc4880p443/packages.yaml` |
 | [4.3-inch JC4880P443 V3](/screens/jc4880p443-v3) | `devices/guition-esp32-p4-jc4880p443-v3/packages.yaml` |
 | 4-inch ESP32-P4 86 Panel | `devices/esp32-p4-86/packages.yaml` |
+| [5-inch Waveshare ESP32-P4-WIFI6-Touch-LCD-5](/screens/p4-touch-lcd-5) | `devices/esp32-p4-wifi6-touch-lcd-5/packages.yaml` |
 | 4-inch 4848S040 | `devices/guition-esp32-s3-4848s040/packages.yaml` |
 
 ## ESPHome Device Builder

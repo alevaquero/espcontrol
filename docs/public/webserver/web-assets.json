@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "bundles": [
     {
-      "id": "2f8e23d230296ad6cb7f25d08f26eff5ebe08b3da590bd50ff370c3e12d00192",
-      "sha256": "2f8e23d230296ad6cb7f25d08f26eff5ebe08b3da590bd50ff370c3e12d00192",
-      "path": "bundles/2f8e23d230296ad6cb7f25d08f26eff5ebe08b3da590bd50ff370c3e12d00192/www.js",
+      "id": "d9b51dd9837f70a6a88d9eb2622ec3b7ddfc557c36012c0e9d10277b63409f3d",
+      "sha256": "d9b51dd9837f70a6a88d9eb2622ec3b7ddfc557c36012c0e9d10277b63409f3d",
+      "path": "bundles/d9b51dd9837f70a6a88d9eb2622ec3b7ddfc557c36012c0e9d10277b63409f3d/www.js",
       "deviceProfiles": [
         "guition-esp32-p4-jc1060p470",
         "guition-esp32-p4-jc1060p470-v2",
@@ -14,6 +14,7 @@
         "guition-esp32-p4-jc8012p4a1-v2",
         "guition-esp32-p4-jc8012p4a1-v3",
         "esp32-p4-86",
+        "esp32-p4-wifi6-touch-lcd-5",
         "guition-esp32-s3-4848s040"
       ],
       "firmwareVersions": [
@@ -22,9 +23,9 @@
       "webAssetVersion": 2
     },
     {
-      "id": "2f8e23d230296ad6cb7f25d08f26eff5ebe08b3da590bd50ff370c3e12d00192",
-      "sha256": "2f8e23d230296ad6cb7f25d08f26eff5ebe08b3da590bd50ff370c3e12d00192",
-      "path": "bundles/2f8e23d230296ad6cb7f25d08f26eff5ebe08b3da590bd50ff370c3e12d00192/www.js",
+      "id": "d9b51dd9837f70a6a88d9eb2622ec3b7ddfc557c36012c0e9d10277b63409f3d",
+      "sha256": "d9b51dd9837f70a6a88d9eb2622ec3b7ddfc557c36012c0e9d10277b63409f3d",
+      "path": "bundles/d9b51dd9837f70a6a88d9eb2622ec3b7ddfc557c36012c0e9d10277b63409f3d/www.js",
       "deviceProfiles": [
         "guition-esp32-p4-jc1060p470",
         "guition-esp32-p4-jc1060p470-v2",
@@ -34,6 +35,7 @@
         "guition-esp32-p4-jc8012p4a1-v2",
         "guition-esp32-p4-jc8012p4a1-v3",
         "esp32-p4-86",
+        "esp32-p4-wifi6-touch-lcd-5",
         "guition-esp32-s3-4848s040"
       ],
       "firmwareVersions": [
@@ -54,6 +56,7 @@
         "guition-esp32-p4-jc8012p4a1-v2",
         "guition-esp32-p4-jc8012p4a1-v3",
         "esp32-p4-86",
+        "esp32-p4-wifi6-touch-lcd-5",
         "guition-esp32-s3-4848s040"
       ],
       "firmwareVersions": [
@@ -78,6 +81,7 @@
         "guition-esp32-p4-jc8012p4a1-v2",
         "guition-esp32-p4-jc8012p4a1-v3",
         "esp32-p4-86",
+        "esp32-p4-wifi6-touch-lcd-5",
         "guition-esp32-s3-4848s040"
       ],
       "firmwareVersions": [
