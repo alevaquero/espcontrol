@@ -289,9 +289,14 @@ inline void remote_layout_modal(const ControlModalLayout &layout) {
       y = placement.row_y + (row_index / cols) * (k + g);
       ++row_index;
     }
-    lv_obj_set_size(key.btn, k, k);
-    lv_obj_set_style_radius(key.btn, k / 2, LV_PART_MAIN);
-    lv_obj_set_pos(key.btn, x, y);
+    // OK grows into the gaps around its cell, up to the edge of the arrow
+    // circles, and stays on top so it wins touches near its rim.
+    const bool is_ok = std::strcmp(key.def->option, "ok") == 0;
+    const lv_coord_t size = is_ok ? k + g * 2 : k;
+    lv_obj_set_size(key.btn, size, size);
+    lv_obj_set_style_radius(key.btn, size / 2, LV_PART_MAIN);
+    lv_obj_set_pos(key.btn, is_ok ? x - g : x, is_ok ? y - g : y);
+    if (is_ok) lv_obj_move_foreground(key.btn);
   }
   if (ui.wheel) {
     lv_obj_set_size(ui.wheel, placement.pad_w, placement.pad_w);
