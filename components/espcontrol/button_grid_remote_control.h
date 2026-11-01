@@ -11,7 +11,7 @@ enum class RemoteKeyGroup : uint8_t {
 
 struct RemoteKeyDef {
   const char *option;
-  const char *icon;
+  const char *icon;  // nullptr for a key shown without an icon.
   RemoteKeyGroup group;
   uint8_t position;  // Cell in the 3x3 pad, or row in the volume column.
 };
@@ -20,7 +20,7 @@ inline const RemoteKeyDef *remote_key_defs(size_t *count) {
   static const RemoteKeyDef defs[] = {
     {"up", "Chevron Up", RemoteKeyGroup::DPAD, 1},
     {"lt", "Chevron Left", RemoteKeyGroup::DPAD, 3},
-    {"ok", "Check", RemoteKeyGroup::DPAD, 4},
+    {"ok", nullptr, RemoteKeyGroup::DPAD, 4},
     {"rt", "Chevron Right", RemoteKeyGroup::DPAD, 5},
     {"dn", "Chevron Down", RemoteKeyGroup::DPAD, 7},
     {"vu", "Volume Plus", RemoteKeyGroup::VOLUME, 0},
@@ -80,6 +80,7 @@ struct RemoteModalUi {
   lv_obj_t *overlay = nullptr;
   lv_obj_t *panel = nullptr;
   lv_obj_t *back_btn = nullptr;
+  lv_obj_t *wheel = nullptr;  // Shared circle behind the direction keys.
   lv_obj_t *volume_bar = nullptr;  // Shared pill behind the volume keys.
   std::string entity;
   uint32_t generation = 0;
@@ -275,9 +276,9 @@ inline void remote_layout_modal(const ControlModalLayout &layout) {
     if (!key.btn) continue;
     lv_coord_t x = 0, y = 0;
     if (key.def->group == RemoteKeyGroup::DPAD) {
-      const lv_coord_t pad_x = placement.cluster_x + (has_volume ? k + placement.cluster_gap : 0);
-      x = pad_x + (key.def->position % 3) * (k + g);
-      y = placement.cluster_y + (key.def->position / 3) * (k + g);
+      // Direction keys sit inside the wheel, so their position is wheel-relative.
+      x = (key.def->position % 3) * (k + g);
+      y = (key.def->position / 3) * (k + g);
     } else if (key.def->group == RemoteKeyGroup::VOLUME) {
       // Volume keys sit inside the bar, so their position is bar-relative.
       x = 0;
@@ -292,6 +293,12 @@ inline void remote_layout_modal(const ControlModalLayout &layout) {
     lv_obj_set_style_radius(key.btn, k / 2, LV_PART_MAIN);
     lv_obj_set_pos(key.btn, x, y);
   }
+  if (ui.wheel) {
+    lv_obj_set_size(ui.wheel, placement.pad_w, placement.pad_w);
+    lv_obj_set_style_radius(ui.wheel, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+    lv_obj_set_pos(ui.wheel, placement.cluster_x + (has_volume ? k + placement.cluster_gap : 0),
+                   placement.cluster_y);
+  }
   if (ui.volume_bar) {
     lv_obj_set_size(ui.volume_bar, k, k * 3 + g * 2);
     lv_obj_set_style_radius(ui.volume_bar, k / 2, LV_PART_MAIN);
@@ -300,7 +307,8 @@ inline void remote_layout_modal(const ControlModalLayout &layout) {
   if (ui.back_btn) lv_obj_move_foreground(ui.back_btn);
 }
 
-inline lv_obj_t *remote_create_volume_bar(lv_obj_t *panel, uint32_t surface) {
+// The shared background behind a group of keys: the wheel or the volume bar.
+inline lv_obj_t *remote_create_key_surface(lv_obj_t *panel, uint32_t surface) {
   lv_obj_t *bar = lv_obj_create(panel);
   if (!bar) return nullptr;
   lv_obj_set_style_bg_color(bar, lv_color_hex(surface), LV_PART_MAIN);
@@ -313,9 +321,10 @@ inline lv_obj_t *remote_create_volume_bar(lv_obj_t *panel, uint32_t surface) {
   return bar;
 }
 
-// A transparent key inside the volume bar; pressing it tints just that part.
-inline lv_obj_t *remote_create_volume_key(lv_obj_t *bar, const char *icon) {
-  lv_obj_t *btn = lv_btn_create(bar);
+// A transparent key inside the wheel or volume bar; pressing it tints just
+// that part. A null icon leaves the key blank.
+inline lv_obj_t *remote_create_inset_key(lv_obj_t *surface, const char *icon) {
+  lv_obj_t *btn = lv_btn_create(surface);
   if (!btn) return nullptr;
   lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, LV_PART_MAIN);
   lv_obj_set_style_border_width(btn, 0, LV_PART_MAIN);
@@ -327,7 +336,7 @@ inline lv_obj_t *remote_create_volume_key(lv_obj_t *bar, const char *icon) {
   lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, pressed);
   apply_push_button_transition(btn);
   lv_obj_clear_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_t *label = lv_label_create(btn);
+  lv_obj_t *label = icon ? lv_label_create(btn) : nullptr;
   if (label) {
     lv_label_set_display_text(label, icon);
     lv_obj_set_style_text_color(label, lv_color_hex(current_theme().text_primary), LV_PART_MAIN);
@@ -374,23 +383,30 @@ inline void remote_open_modal(const ParsedCfg &config, lv_obj_t *owner) {
 
   const uint32_t surface = theme_display_color(current_theme().surface_primary);
   for (const RemoteModalKey &key : ui.keys) {
-    if (key.def->group == RemoteKeyGroup::VOLUME && !ui.volume_bar) {
-      ui.volume_bar = remote_create_volume_bar(ui.panel, surface);
+    if (key.def->group == RemoteKeyGroup::DPAD && !ui.wheel) {
+      ui.wheel = remote_create_key_surface(ui.panel, surface);
+    } else if (key.def->group == RemoteKeyGroup::VOLUME && !ui.volume_bar) {
+      ui.volume_bar = remote_create_key_surface(ui.panel, surface);
     }
   }
   for (size_t i = 0; i < ui.keys.size(); ++i) {
     RemoteModalKey &key = ui.keys[i];
-    if (key.def->group == RemoteKeyGroup::VOLUME) {
-      key.btn = ui.volume_bar ? remote_create_volume_key(ui.volume_bar, find_icon(key.def->icon)) : nullptr;
+    const char *icon = key.def->icon ? find_icon(key.def->icon) : nullptr;
+    if (key.def->group == RemoteKeyGroup::DPAD) {
+      key.btn = ui.wheel ? remote_create_inset_key(ui.wheel, icon) : nullptr;
+    } else if (key.def->group == RemoteKeyGroup::VOLUME) {
+      key.btn = ui.volume_bar ? remote_create_inset_key(ui.volume_bar, icon) : nullptr;
     } else {
       key.btn = control_modal_create_round_button(
-        ui.panel, 48, find_icon(key.def->icon), remote_icon_font_ref(),
+        ui.panel, 48, icon, remote_icon_font_ref(),
         theme_display_color(current_theme().border), surface,
         icon_width_compensation_percent());
     }
     if (!key.btn) continue;
     if (std::strcmp(key.def->option, "ok") == 0) {
+      // OK is the solid accent circle in the middle of the wheel.
       lv_obj_set_style_bg_color(key.btn, lv_color_hex(DEFAULT_ACCENT_COLOR), LV_PART_MAIN);
+      lv_obj_set_style_bg_opa(key.btn, LV_OPA_COVER, LV_PART_MAIN);
     }
     lv_obj_add_event_cb(key.btn, [](lv_event_t *event) {
       remote_send_key(reinterpret_cast<uintptr_t>(lv_event_get_user_data(event)));
