@@ -9,6 +9,7 @@
     { "name": "number_display", "label": "Icon & Temperatures", "kind": "choice", "values": ["icon", "actual", "target"], "defaultValue": "target", "omitDefault": true },
     { "name": "temperature_step", "label": "Temperature Step", "kind": "choice", "values": ["1", "0.5"], "defaultValue": "1", "omitDefault": true },
     { "name": "large_numbers", "label": "Large Temperature Numbers", "kind": "flag", "omitDefault": true },
+    { "name": "mode_icon", "label": "Mode Icon", "kind": "flag", "omitDefault": true },
     { "name": "climate_tabs", "label": "Visible Tabs", "kind": "text", "defaultValue": "temperature|mode|preset|fan|swing|horizontal_swing", "omitDefault": true }
   ],
   "normalization": {
@@ -22,7 +23,7 @@
       "options": { "policy": "hook", "hook": "normalize_climate_options" }
     },
     "unknownOptions": "drop",
-    "canonicalOptionOrder": ["label_display", "number_display", "temperature_step", "large_numbers", "climate_tabs"],
+    "canonicalOptionOrder": ["label_display", "number_display", "temperature_step", "large_numbers", "mode_icon", "climate_tabs"],
     "optionHook": "normalize_climate_options"
   },
   "behavior": {

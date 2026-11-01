@@ -116,6 +116,7 @@ struct ClimateControlCtx {
   int precision = 0;
   std::string label_display = "label";
   std::string number_display = "target";
+  bool show_mode_icon = false;
   // Keep reports separate while plus/minus edits wait for their debounce.
   int reported_target_tenths = CLIMATE_DEFAULT_TARGET_TENTHS;
   int reported_low_tenths = CLIMATE_DEFAULT_LOW_TENTHS;
@@ -135,6 +136,7 @@ struct ClimateControlCtx {
   lv_obj_t *sensor_container = nullptr;
   lv_obj_t *value_lbl = nullptr;
   lv_obj_t *unit_lbl = nullptr;
+  lv_obj_t *mode_icon_lbl = nullptr;  // Optional HVAC mode icon in the card centre.
   const char *icon_off_glyph = nullptr;
   const char *icon_on_glyph = nullptr;
   int width_compensation_percent = 100;
@@ -1130,6 +1132,10 @@ inline void climate_update_card(ClimateControlCtx *ctx) {
   if (ctx->label_lbl) {
     lv_label_set_display_text(ctx->label_lbl, climate_card_label(ctx).c_str());
     climate_layout_card_label(ctx->label_lbl);
+  }
+  if (ctx->mode_icon_lbl) {
+    lv_label_set_display_text(ctx->mode_icon_lbl, climate_option_icon("hvac", ctx->hvac_mode));
+    lv_obj_align(ctx->mode_icon_lbl, LV_ALIGN_CENTER, 0, 0);
   }
   if (ctx->btn) {
     set_card_checked_state(ctx->btn, climate_is_active(ctx));
@@ -2722,6 +2728,7 @@ inline ClimateControlCtx *create_climate_control_context(
   climate_apply_saved_range(ctx, p.precision);
   ctx->label_display = normalize_climate_label_display(cfg_option_value(p.options, "label_display"));
   ctx->number_display = normalize_climate_number_display(cfg_option_value(p.options, "number_display"));
+  ctx->show_mode_icon = cfg_option_token_present(p.options, "mode_icon");
   ctx->configured_step_tenths = normalize_climate_temperature_step(
     cfg_option_value(p.options, "temperature_step")) == "0.5"
       ? CLIMATE_DEFAULT_STEP_TENTHS
@@ -2751,6 +2758,15 @@ inline ClimateControlCtx *create_climate_control_context(
   ctx->card_icon_font = card_icon_font ? card_icon_font : icon_font;
   ctx->icon_font = icon_font;
   ctx->width_compensation_percent = normalize_width_compensation_percent(width_compensation_percent);
+  if (btn && ctx->show_mode_icon) {
+    // A plain child of the card; the slot reset deletes it on rebuild.
+    ctx->mode_icon_lbl = lv_label_create(btn);
+    if (ctx->mode_icon_lbl) {
+      if (icon_font) lv_obj_set_style_text_font(ctx->mode_icon_lbl, icon_font, LV_PART_MAIN);
+      lv_obj_clear_flag(ctx->mode_icon_lbl, LV_OBJ_FLAG_CLICKABLE);
+      apply_icon_width_compensation(ctx->mode_icon_lbl);
+    }
+  }
   if (btn) lv_obj_set_user_data(btn, ctx);
   int &count = climate_control_ref_count();
   if (count < MAX_GRID_SLOTS + MAX_SUBPAGE_ITEMS) climate_control_refs()[count++] = ctx;

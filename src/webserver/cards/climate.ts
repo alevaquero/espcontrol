@@ -38,6 +38,8 @@ export function registerClimateCardTypes(
         setClimateNumberDisplayMode,
         climateTemperatureStep,
         setClimateTemperatureStep,
+        climateModeIconEnabled,
+        setClimateModeIcon,
         parseClimatePrecisionConfig,
         climatePrecisionConfig,
     } = accessOptions;
@@ -81,6 +83,16 @@ export function registerClimateCardTypes(
             idSuffix: "large-temperature-numbers",
             supported: function (this: any, b?: any) {
                 return climateNumberDisplayMode(b) !== "icon";
+            },
+        },
+        modeIcon: {
+            label: "Mode Icon",
+            idSuffix: "climate-mode-icon",
+            checked: function (this: any, b?: any) { return climateModeIconEnabled(b); },
+            onChange: function (this: any, b?: any, helpers?: any, checked?: any) {
+                setClimateModeIcon(b, checked);
+                helpers.saveField("options", b.options);
+                renderQueue.schedule();
             },
         },
         preview: {
@@ -213,6 +225,7 @@ export function registerClimateCardTypes(
                 renderQueue.schedule();
             });
             helpers.renderCardLargeNumbersToggle(cardSettings, b, helpers, CLIMATE_CARD_METADATA);
+            helpers.renderCardOptionToggle(cardSettings, b, helpers, CLIMATE_CARD_METADATA.modeIcon);
             panel.appendChild(cardSettingsDisclosure.panel);
             panel.appendChild(modalTabsDisclosure.panel);
             var advancedDisclosure: any = helpers.disclosureSection("Advanced", helpers.idPrefix + "climate-advanced", false);
@@ -253,17 +266,21 @@ export function registerClimateCardTypes(
             function climateLabelHtml(this: any) {
                 return cardBadgeLabelHtml(helpers, label, CLIMATE_CARD_METADATA.preview.badge);
             }
+            // The preview shows Heat; the panel shows the live HVAC mode.
+            var modeIconHtml: any = climateModeIconEnabled(b)
+                ? '<span class="sp-climate-mode-icon mdi mdi-' + iconSlug("Fire") + '"></span>'
+                : "";
             if (numberMode === "icon") {
                 var iconName: any = b.icon && b.icon !== "Auto" ? b.icon : "Thermostat";
                 return {
-                    iconHtml: '<span class="sp-btn-icon mdi mdi-' + iconSlug(iconName) + '"></span>',
+                    iconHtml: '<span class="sp-btn-icon mdi mdi-' + iconSlug(iconName) + '"></span>' + modeIconHtml,
                     labelHtml: climateLabelHtml(),
                     labelEditable: labelMode === "label",
                 };
             }
             return {
                 buttonClass: "sp-climate-temp-card",
-                iconHtml: cardSensorPreviewHtml(b, helpers, numberVal, unit),
+                iconHtml: cardSensorPreviewHtml(b, helpers, numberVal, unit) + modeIconHtml,
                 labelHtml: climateLabelHtml(),
                 labelEditable: labelMode === "label",
             };

@@ -1,5 +1,5 @@
 import { preserveCardColorOptions } from "../model/config_primitives";
-import { configOptionValue, setConfigOptionValue } from "../model/config_primitives";
+import { configOptionEnabled, configOptionValue, setConfigOption, setConfigOptionValue } from "../model/config_primitives";
 import { cardContractCard } from "../generated/card_contract";
 import {
     ALARM_ACTIONS_OPTION,
@@ -147,6 +147,7 @@ export function createConfigAccessClimateAlarmOptionsFeature(
         var values: any = spec && spec.values ? spec.values : [];
         return values.indexOf(value) >= 0 ? value : climateDefaultTemperatureStep();
     }
+    var CLIMATE_MODE_ICON_OPTION: any = "mode_icon";
     function normalizeClimateOptions(this: any, options?: any, includeControlTabs?: any) {
         var labelMode: any = normalizeClimateLabelDisplayMode(configOptionValue(options, CLIMATE_LABEL_DISPLAY_OPTION));
         var numberMode: any = normalizeClimateNumberDisplayMode(configOptionValue(options, CLIMATE_NUMBER_DISPLAY_OPTION));
@@ -163,6 +164,9 @@ export function createConfigAccessClimateAlarmOptionsFeature(
         }
         if (numberMode !== "icon") {
             out = copyLargeNumbersOption(out, options);
+        }
+        if (configOptionEnabled(options, CLIMATE_MODE_ICON_OPTION)) {
+            out = setConfigOption(out, CLIMATE_MODE_ICON_OPTION, true);
         }
         if (includeControlTabs) {
             var tabs: any = normalizeClimateControlTabs(configOptionValue(options, CLIMATE_CONTROL_TABS_OPTION));
@@ -191,6 +195,16 @@ export function createConfigAccessClimateAlarmOptionsFeature(
             return "";
         var normalized: any = normalizeClimateNumberDisplayMode(mode);
         b.options = setConfigOptionValue(b.options, CLIMATE_NUMBER_DISPLAY_OPTION, normalized === climateDefaultNumberDisplayMode() ? "" : normalized);
+        b.options = normalizeClimateOptions(b.options, isClimateCardType(b.type));
+        return b.options;
+    }
+    function climateModeIconEnabled(this: any, b?: any) {
+        return configOptionEnabled(b && b.options, CLIMATE_MODE_ICON_OPTION);
+    }
+    function setClimateModeIcon(this: any, b?: any, enabled?: any) {
+        if (!b)
+            return "";
+        b.options = setConfigOption(b.options, CLIMATE_MODE_ICON_OPTION, !!enabled);
         b.options = normalizeClimateOptions(b.options, isClimateCardType(b.type));
         return b.options;
     }
@@ -414,6 +428,8 @@ export function createConfigAccessClimateAlarmOptionsFeature(
         setClimateNumberDisplayMode,
         climateTemperatureStep,
         setClimateTemperatureStep,
+        climateModeIconEnabled,
+        setClimateModeIcon,
         alarmActionInfo,
         alarmActionValues,
         alarmPinRequired,
