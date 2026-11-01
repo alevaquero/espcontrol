@@ -207,6 +207,16 @@ export function createConfigSensorOptionsFeature(cardRegistry: CardRegistry) {
         if (configOptionEnabled(options, SENSOR_ACTIVE_COLOR_OPTION)) {
             out = setConfigOption(out, SENSOR_ACTIVE_COLOR_OPTION, true);
         }
+        // Optional second sensor shown on the right half of the card.
+        var sensor2: any = configOptionValue(options, "sensor2").trim();
+        if (sensor2) {
+            out = setConfigOptionValue(out, "sensor2", sensor2);
+            out = setConfigOptionValue(out, "label2", configOptionValue(options, "label2"));
+            if (configOptionValue(options, "subtype2") === "window")
+                out = setConfigOptionValue(out, "subtype2", "window");
+            if (configOptionEnabled(options, "active_color2"))
+                out = setConfigOption(out, "active_color2", true);
+        }
         return preserveCardColorOptions(options, out);
     }
     function presenceActiveColorEnabled(this: any, b?: any) {

@@ -127,6 +127,13 @@ export function createWebStyles(dragAnimation: boolean): string {
         ".sp-weather-grid .sp-weather-day{justify-content:center}.sp-weather-grid .sp-weather-day .mdi{margin-bottom:var(--weather-icon-gap)}" +
         ".sp-weather-wind-speed,.sp-rainfall-value,.sp-weather-temperature-high{white-space:nowrap;font-size:var(--btn-small-text);color:var(--card-text-color,var(--preview-text-primary));opacity:.7}" +
         ".sp-sensor-value{font-size:var(--btn-icon);line-height:1;font-weight:300}" +
+        ".sp-door-window-half{position:absolute;top:0;bottom:0;width:50%;z-index:0}" +
+        ".sp-door-window-half-right{right:0;border-radius:0 var(--btn-r) var(--btn-r) 0}" +
+        ".sp-door-window-right-lit .sp-door-window-half-right{background:var(--card-active-color)}" +
+        ".sp-door-window-icon2{position:absolute;right:var(--btn-pad);top:var(--btn-pad);font-size:var(--btn-icon);line-height:1;z-index:1}" +
+        ".sp-door-window-labels{display:flex;gap:6px;position:relative;z-index:1}" +
+        ".sp-door-window-labels>.sp-btn-label{flex:1 1 0;min-width:0}" +
+        ".sp-door-window-label2{text-align:right}" +
         ".sp-sensor-unit{font-size:var(--btn-label);line-height:1;color:var(--card-text-color,var(--preview-text-primary))}" +
         ".sp-slider-preview{position:absolute;inset:0;border-radius:var(--r);overflow:hidden;pointer-events:none}" +
         ".sp-slider-track{display:block;width:100%;height:100%;position:relative}" +

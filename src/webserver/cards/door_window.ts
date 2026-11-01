@@ -8,15 +8,18 @@ import {
     cardContractPickerKey,
 } from "../generated/card_contract";
 import { iconSlug } from "../application/ui_primitives";
-import type { CardRegistry } from "../application/card_registry";
+import { configOptionEnabled, configOptionValue, setConfigOption, setConfigOptionValue } from "../model/config_primitives";
+import type { CardRegistry, CardUiServices } from "../application/card_registry";
 import type { ConfigSensorOptionsFeature } from "../application/config_sensor_options";
 import type { ControlsFieldsFeature } from "../application/controls_fields";
 export function registerDoorWindowCardTypes(
     registry: CardRegistry,
     sensorOptions: ConfigSensorOptionsFeature,
     fields: ControlsFieldsFeature,
+    cardUi: CardUiServices,
 ): void {
     const { cardBadgePreview } = fields;
+    const { renderPreview } = cardUi;
     const {
         normalizeDoorWindowSubtype,
         doorWindowActiveColorEnabled,
@@ -60,6 +63,68 @@ export function registerDoorWindowCardTypes(
             checked: doorWindowActiveColorEnabled,
         },
     };
+    // Optional second sensor on the right half, stored in the card options.
+    function renderSecondSensorSettings(this: any, panel?: any, b?: any, helpers?: any) {
+        var hasSensor: any = !!configOptionValue(b.options, "sensor2");
+        var disclosure: any = helpers.disclosureSection(
+            "Right Sensor", helpers.idPrefix + "door-window-second", b._doorWindowSecondOpen === true || hasSensor);
+        var section: any = disclosure.section;
+        var hint: any = document.createElement("div");
+        hint.className = "sp-field-hint";
+        hint.textContent = "Add a second sensor to split the card. It shows on the right half and lights up on its own.";
+        section.appendChild(hint);
+        function saveOptions(this: any, rerender?: any) {
+            b.options = normalizeDoorWindowOptions(b.options);
+            b._doorWindowSecondOpen = true;
+            helpers.saveField("options", b.options);
+            if (rerender)
+                renderPreview();
+        }
+        var typeField: any = helpers.selectField("Right Type", helpers.idPrefix + "door-window-type2",
+            DOOR_WINDOW_CARD_METADATA.mode.options,
+            normalizeDoorWindowSubtype(configOptionValue(b.options, "subtype2")));
+        typeField.select.addEventListener("change", function (this: any) {
+            b.options = setConfigOptionValue(b.options, "subtype2", typeField.select.value === "window" ? "window" : "");
+            saveOptions(true);
+        });
+        section.appendChild(typeField.field);
+        var sensorField: any = helpers.renderCardEntityField(section, b, helpers, {
+            entity: {
+                label: "Right Sensor Entity",
+                idSuffix: "door-window-sensor2",
+                value: function (this: any) { return configOptionValue(b.options, "sensor2"); },
+                placeholder: "e.g. binary_sensor.kitchen_window",
+                domains: function (this: any) { return cardContractDomains("door_window"); },
+                bindName: null,
+                rerender: false,
+            },
+        });
+        function syncSensor(this: any) {
+            var hadSensor: any = !!configOptionValue(b.options, "sensor2");
+            b.options = setConfigOptionValue(b.options, "sensor2", sensorField.input.value);
+            // Match the left sensor's default: a newly added sensor lights when open.
+            if (!hadSensor && configOptionValue(b.options, "sensor2"))
+                b.options = setConfigOption(b.options, "active_color2", true);
+            saveOptions(true);
+        }
+        sensorField.input.addEventListener("change", syncSensor);
+        sensorField.input.addEventListener("blur", syncSensor);
+        var labelField: any = helpers.textField("Right Label", helpers.idPrefix + "door-window-label2",
+            configOptionValue(b.options, "label2"), "e.g. Kitchen Window");
+        labelField.input.addEventListener("input", function (this: any) {
+            b.options = setConfigOptionValue(b.options, "label2", labelField.input.value);
+            saveOptions(true);
+        });
+        section.appendChild(labelField.field);
+        var litRow: any = helpers.toggleRow("Right Lit When Open", helpers.idPrefix + "door-window-active-color2",
+            configOptionEnabled(b.options, "active_color2"));
+        litRow.input.addEventListener("change", function (this: any) {
+            b.options = setConfigOption(b.options, "active_color2", litRow.input.checked);
+            saveOptions(true);
+        });
+        section.appendChild(litRow.row);
+        panel.appendChild(disclosure.panel);
+    }
     registry.register("door_window", {
         label: function (this: any) { return cardContractCardLabel("door_window"); },
         allowInSubpage: function (this: any) { return cardContractAllowInSubpage("door_window"); },
@@ -134,10 +199,29 @@ export function registerDoorWindowCardTypes(
                 helpers.saveField("icon_on", b.icon_on);
             }
             setSubtype(b.precision, false);
+            renderSecondSensorSettings(panel, b, helpers);
         },
         renderPreview: function (this: any, b?: any, helpers?: any) {
             var subtype: any = normalizeDoorWindowSubtype(b.precision);
             var label: any = b.label || b.sensor || (subtype === "window" ? "Window" : "Door");
+            var sensor2: any = configOptionValue(b.options, "sensor2");
+            if (sensor2) {
+                // Split preview: the left sensor shows closed, the right one open.
+                var subtype2: any = normalizeDoorWindowSubtype(configOptionValue(b.options, "subtype2"));
+                var label2: any = configOptionValue(b.options, "label2") || sensor2;
+                var leftIcon: any = b.icon && b.icon !== "Auto" ? b.icon : doorWindowClosedIcon(subtype);
+                return {
+                    buttonClass: "sp-door-window-split" +
+                        (configOptionEnabled(b.options, "active_color2") ? " sp-door-window-right-lit" : ""),
+                    iconHtml: '<span class="sp-door-window-half sp-door-window-half-right"></span>' +
+                        '<span class="sp-btn-icon mdi mdi-' + iconSlug(leftIcon) + '"></span>' +
+                        '<span class="sp-door-window-icon2 mdi mdi-' + iconSlug(doorWindowOpenIcon(subtype2)) + '"></span>',
+                    labelHtml: '<span class="sp-btn-label-row sp-door-window-labels">' +
+                        '<span class="sp-btn-label">' + helpers.escHtml(label) + '</span>' +
+                        '<span class="sp-btn-label sp-door-window-label2">' + helpers.escHtml(label2) + '</span></span>',
+                    labelEditable: false,
+                };
+            }
             return cardBadgePreview(b, helpers, {
                 label: label,
                 iconFallback: doorWindowClosedIcon(subtype),

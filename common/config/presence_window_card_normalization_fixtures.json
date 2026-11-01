@@ -103,5 +103,35 @@
       "precision": "",
       "options": ""
     }
+  },
+  {
+    "name": "door window keeps a second sensor in canonical order",
+    "input": "binary_sensor.front_door;Front Door;Auto;Auto;binary_sensor.front_door;;door_window;door;active_color2,subtype2=window,junk=1,label2=Kitchen%2C Window,sensor2=binary_sensor.kitchen_window,active_color",
+    "expected": {
+      "entity": "",
+      "label": "Front Door",
+      "icon": "Door",
+      "icon_on": "Door Open",
+      "sensor": "binary_sensor.front_door",
+      "unit": "",
+      "type": "door_window",
+      "precision": "door",
+      "options": "active_color,sensor2=binary_sensor.kitchen_window,label2=Kitchen%2C Window,subtype2=window,active_color2"
+    }
+  },
+  {
+    "name": "door window drops second sensor settings without a second sensor",
+    "input": "binary_sensor.front_door;Front Door;Auto;Auto;binary_sensor.front_door;;door_window;door;label2=Kitchen,subtype2=window,active_color2",
+    "expected": {
+      "entity": "",
+      "label": "Front Door",
+      "icon": "Door",
+      "icon_on": "Door Open",
+      "sensor": "binary_sensor.front_door",
+      "unit": "",
+      "type": "door_window",
+      "precision": "door",
+      "options": ""
+    }
   }
 ]

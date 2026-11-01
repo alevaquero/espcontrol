@@ -8,7 +8,11 @@
       "label": "Lit When Open",
       "kind": "flag",
       "omitDefault": true
-    }
+    },
+    { "name": "sensor2", "label": "Right Sensor Entity", "kind": "text", "defaultValue": "", "omitDefault": true },
+    { "name": "label2", "label": "Right Label", "kind": "text", "defaultValue": "", "omitDefault": true },
+    { "name": "subtype2", "label": "Right Type", "kind": "choice", "values": ["door", "window"], "defaultValue": "door", "omitDefault": true },
+    { "name": "active_color2", "label": "Right Lit When Open", "kind": "flag", "omitDefault": true }
   ],
   "normalization": {
     "fields": {
@@ -23,7 +27,7 @@
       "options": { "policy": "hook", "hook": "normalize_occupancy_options" }
     },
     "unknownOptions": "drop",
-    "canonicalOptionOrder": ["active_color"],
+    "canonicalOptionOrder": ["active_color", "sensor2", "label2", "subtype2", "active_color2"],
     "optionHook": "normalize_occupancy_options"
   },
   "default": {

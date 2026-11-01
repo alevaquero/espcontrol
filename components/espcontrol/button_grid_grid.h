@@ -992,6 +992,8 @@ inline void refresh_card_layout(BtnSlot &s, const ParsedCfg &p,
     espcontrol::cards::weather_driver_refresh_layout(s, p, context, display, row_span, col_span);
     return;
   }
+  if (espcontrol::cards::status_entity_driver_refresh_layout(
+        s, p, context, row_span, col_span)) return;
   if (espcontrol::cards::navigation_driver_refresh_layout(
         s, p, context, cfg)) return;
 

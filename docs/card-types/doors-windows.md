@@ -24,6 +24,17 @@ The default icon pairs are:
 
 You can change the closed or open icon if your sensor needs a different look.
 
+## Two Sensors on One Card
+
+Open **Right Sensor** to show a second door or window on the same card. The card splits in two: the first sensor keeps the icon and label on the left, and the second sensor shows its own icon and label on the right.
+
+1. Choose the **Right Type**, **Door** or **Window**, for the second sensor's icons.
+2. Enter the **Right Sensor Entity**, for example `binary_sensor.kitchen_window`.
+3. Set a **Right Label** if you want custom text. If left blank, the panel uses the entity name from Home Assistant.
+4. **Right Lit When Open** works like **Lit When Open**, but only for the right half. It is on by default when you add the second sensor.
+
+Each half lights up on its own, so if one is open and the other is closed, only the open half uses the active colour. The card shows as unavailable only when both sensors are unavailable. Clear the **Right Sensor Entity** to return to a single-sensor card.
+
 ## How It Works on the Panel
 
 - The card is read-only, so tapping it does nothing.

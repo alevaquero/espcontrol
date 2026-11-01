@@ -859,8 +859,22 @@ inline const char *door_window_open_icon_name(const std::string &subtype) {
   return normalize_door_window_subtype(subtype) == "window" ? "Window Open" : "Door Open";
 }
 
+// A Doors & Windows card can show a second sensor on its right half, with its
+// own label, door/window subtype, and Lit When Open setting.
 inline std::string door_window_card_options_normalized(const std::string &options) {
-  return cfg_option_token_present(options, "active_color") ? "active_color" : "";
+  std::string out = cfg_option_token_present(options, "active_color") ? "active_color" : "";
+  const std::string sensor2 = cfg_option_value(options, "sensor2");
+  if (sensor2.empty()) return out;
+  auto append = [&out](const std::string &part) {
+    if (!out.empty()) out += ",";
+    out += part;
+  };
+  append("sensor2=" + encode_compact_field(sensor2));
+  const std::string label2 = cfg_option_value(options, "label2");
+  if (!label2.empty()) append("label2=" + encode_compact_field(label2));
+  if (cfg_option_value(options, "subtype2") == "window") append("subtype2=window");
+  if (cfg_option_token_present(options, "active_color2")) append("active_color2");
+  return out;
 }
 
 inline std::string presence_card_options_normalized(const std::string &options) {
