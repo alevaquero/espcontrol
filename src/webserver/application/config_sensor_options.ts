@@ -202,18 +202,32 @@ export function createConfigSensorOptionsFeature(cardRegistry: CardRegistry) {
         b.options = setConfigOption(b.options, SENSOR_ACTIVE_COLOR_OPTION, enabled);
         return b.options;
     }
+    function normalizeDoorWindowSides(this: any, options?: any) {
+        var sides: any = configOptionValue(options, "sides");
+        if (sides === "right" || sides === "both" || sides === "left")
+            return sides;
+        // Cards saved before the side choice existed split when a second sensor is set.
+        return configOptionValue(options, "sensor2") ? "both" : "left";
+    }
     function normalizeDoorWindowOptions(this: any, options?: any) {
         var out: any = "";
         if (configOptionEnabled(options, SENSOR_ACTIVE_COLOR_OPTION)) {
             out = setConfigOption(out, SENSOR_ACTIVE_COLOR_OPTION, true);
         }
-        // Optional second sensor shown on the right half of the card.
-        var sensor2: any = configOptionValue(options, "sensor2").trim();
-        if (sensor2) {
-            out = setConfigOptionValue(out, "sensor2", sensor2);
+        // The card shows its own sensor on the left, a second sensor on the
+        // right, or both side by side.
+        var sides: any = normalizeDoorWindowSides(options);
+        if (sides !== "left") {
+            out = setConfigOptionValue(out, "sides", sides);
+            out = setConfigOptionValue(out, "sensor2", configOptionValue(options, "sensor2"));
             out = setConfigOptionValue(out, "label2", configOptionValue(options, "label2"));
             if (configOptionValue(options, "subtype2") === "window")
                 out = setConfigOptionValue(out, "subtype2", "window");
+            ["icon2", "icon_on2"].forEach(function (this: any, key?: any) {
+                var icon: any = configOptionValue(options, key);
+                if (icon !== "Auto")
+                    out = setConfigOptionValue(out, key, icon);
+            });
             if (configOptionEnabled(options, "active_color2"))
                 out = setConfigOption(out, "active_color2", true);
         }
@@ -266,6 +280,7 @@ export function createConfigSensorOptionsFeature(cardRegistry: CardRegistry) {
         doorWindowActiveColorEnabled,
         setDoorWindowActiveColorEnabled,
         normalizeDoorWindowOptions,
+        normalizeDoorWindowSides,
         presenceActiveColorEnabled,
         setPresenceActiveColorEnabled,
         normalizePresenceOptions,

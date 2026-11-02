@@ -68,9 +68,9 @@ inline bool status_entity_driver_active_color_enabled(
 }
 
 // ---- Doors & Windows second sensor ------------------------------------------
-// With "sensor2" set, the card splits into two halves. The left half keeps the
-// card's own icon and label; the right half mirrors them for the second
-// sensor. Each half lights independently through a clipped background layer
+// With "sides" set to "right" or "both", the card splits into two halves. The
+// left half keeps the card's own icon and label (blank when only the right
+// side is shown); the right half mirrors them for the second sensor. Each half lights independently through a clipped background layer
 // that sits behind the card content. All objects here are dynamic children of
 // the card and are deleted when the slot is reset.
 
@@ -84,7 +84,24 @@ struct DoorWindowSplitUi {
 
 inline bool door_window_has_second_sensor(const ParsedCfg &config, const Context &context) {
   return context.runtime.type == card_runtime::CardTypeId::DOOR_WINDOW &&
-         !config.sensor.empty() && !cfg_option_value(config.options, "sensor2").empty();
+         normalize_door_window_sides(config.options) != "left" &&
+         !cfg_option_value(config.options, "sensor2").empty();
+}
+
+inline bool door_window_shows_left(const ParsedCfg &config) {
+  return normalize_door_window_sides(config.options) != "right" && !config.sensor.empty();
+}
+
+// A right-only card has no sensor of its own but is still configured.
+inline bool status_entity_driver_has_sensor(const ParsedCfg &config, const Context &context) {
+  return !config.sensor.empty() || door_window_has_second_sensor(config, context);
+}
+
+inline const char *door_window_second_icon(const ParsedCfg &config, bool open) {
+  const std::string icon = cfg_option_value(config.options, open ? "icon_on2" : "icon2");
+  if (!icon.empty() && icon != "Auto") return find_icon(icon.c_str());
+  const std::string subtype = normalize_door_window_subtype(cfg_option_value(config.options, "subtype2"));
+  return find_icon(open ? door_window_open_icon_name(subtype) : door_window_closed_icon_name(subtype));
 }
 
 inline std::string door_window_second_subtype(const ParsedCfg &config) {
@@ -211,7 +228,7 @@ inline bool status_entity_driver_setup_visual(
       static_cast<lv_style_selector_t>(LV_PART_MAIN) |
         static_cast<lv_style_selector_t>(LV_STATE_DEFAULT));
   }
-  if (config.sensor.empty()) return true;
+  if (!status_entity_driver_has_sensor(config, context)) return true;
   lv_obj_clear_flag(slot.icon_lbl, LV_OBJ_FLAG_HIDDEN);
   lv_obj_add_flag(slot.sensor_container, LV_OBJ_FLAG_HIDDEN);
   lv_label_set_display_text(slot.icon_lbl, find_icon("Minus"));
@@ -221,6 +238,10 @@ inline bool status_entity_driver_setup_visual(
     : config.label;
   lv_label_set_display_text(slot.text_lbl, label.c_str());
   if (door_window_has_second_sensor(config, context)) {
+    if (!door_window_shows_left(config)) {
+      lv_label_set_display_text(slot.icon_lbl, "");
+      lv_label_set_display_text(slot.text_lbl, "");
+    }
     door_window_split_create(slot);
     DoorWindowSplitUi ui = door_window_split_ui(slot);
     if (ui.layer) {
@@ -241,7 +262,7 @@ inline bool status_entity_driver_setup_visual(
 inline bool status_entity_driver_attach_interaction(
     BtnSlot &slot, const ParsedCfg &config, const Context &context) {
   if (!status_entity_driver_matches(context)) return false;
-  if (config.sensor.empty()) return true;
+  if (!status_entity_driver_has_sensor(config, context)) return true;
   lv_obj_clear_flag(slot.btn, LV_OBJ_FLAG_CLICKABLE);
   return true;
 }
@@ -271,6 +292,7 @@ inline void status_entity_driver_bind_split(
     lv_obj_t *btn, *icon, *left, *right, *icon2, *label2;
     const char *closed[2], *open[2];
     bool active_color[2];
+    bool show_left;
     bool active[2] = {false, false};
     bool unavailable[2] = {true, true};
     uint32_t on_color, inactive_color;
@@ -282,13 +304,15 @@ inline void status_entity_driver_bind_split(
     }
     void render() const {
       if (!valid()) return;
-      set_card_disabled_state(btn, unavailable[0] && unavailable[1]);
-      lv_label_set_display_text(icon, unavailable[0]
-        ? find_icon("Minus") : (active[0] ? open[0] : closed[0]));
+      set_card_disabled_state(btn, show_left ? unavailable[0] && unavailable[1] : unavailable[1]);
+      if (show_left) {
+        lv_label_set_display_text(icon, unavailable[0]
+          ? find_icon("Minus") : (active[0] ? open[0] : closed[0]));
+      }
       lv_label_set_display_text(icon2, unavailable[1]
         ? find_icon("Minus") : (active[1] ? open[1] : closed[1]));
       theme_set_content_background(btn, custom_background);
-      door_window_paint_half(left, btn, nullptr, active_color[0] && active[0],
+      door_window_paint_half(left, btn, nullptr, show_left && active_color[0] && active[0],
                              on_color, inactive_color, custom_background);
       door_window_paint_half(right, nullptr, label2, active_color[1] && active[1],
                              on_color, inactive_color, custom_background);
@@ -303,11 +327,11 @@ inline void status_entity_driver_bind_split(
   state->right = ui.right;
   state->icon2 = ui.icon2;
   state->label2 = ui.label2;
-  const std::string subtype2 = door_window_second_subtype(config);
+  state->show_left = door_window_shows_left(config);
   state->closed[0] = door_window_closed_icon(config);
   state->open[0] = door_window_open_icon(config);
-  state->closed[1] = find_icon(door_window_closed_icon_name(subtype2));
-  state->open[1] = find_icon(door_window_open_icon_name(subtype2));
+  state->closed[1] = door_window_second_icon(config, false);
+  state->open[1] = door_window_second_icon(config, true);
   state->active_color[0] = door_window_active_color_enabled(config);
   state->active_color[1] = cfg_option_token_present(config.options, "active_color2");
   state->on_color = palette.on_val;
@@ -317,7 +341,7 @@ inline void status_entity_driver_bind_split(
   state->render();
 
   const std::string sensor2 = cfg_option_value(config.options, "sensor2");
-  for (int index = 0; index < 2; ++index) {
+  for (int index = state->show_left ? 0 : 1; index < 2; ++index) {
     ha_subscribe_state(
       index == 0 ? config.sensor : sensor2,
       std::function<void(esphome::StringRef)>([state, index](esphome::StringRef value) {
@@ -326,7 +350,7 @@ inline void status_entity_driver_bind_split(
         state->render();
       }));
   }
-  if (config.label.empty()) subscribe_friendly_name(slot.text_lbl, config.sensor);
+  if (state->show_left && config.label.empty()) subscribe_friendly_name(slot.text_lbl, config.sensor);
   if (cfg_option_value(config.options, "label2").empty()) {
     ha_subscribe_attribute(
       sensor2, std::string("friendly_name"),
@@ -341,12 +365,11 @@ inline bool status_entity_driver_bind_data(
     BtnSlot &slot, const ParsedCfg &config, const Context &context,
     const CardPalette &palette) {
   if (!status_entity_driver_matches(context)) return false;
-  if (config.sensor.empty()) return true;
-
   if (door_window_has_second_sensor(config, context)) {
     status_entity_driver_bind_split(slot, config, palette);
     return true;
   }
+  if (config.sensor.empty()) return true;
 
   const auto type = context.runtime.type;
   const char *inactive_icon = status_entity_driver_inactive_icon(config, context);

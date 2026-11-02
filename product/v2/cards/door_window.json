@@ -9,9 +9,12 @@
       "kind": "flag",
       "omitDefault": true
     },
+    { "name": "sides", "label": "Show", "kind": "choice", "values": ["left", "right", "both"], "defaultValue": "left", "omitDefault": true },
     { "name": "sensor2", "label": "Right Sensor Entity", "kind": "text", "defaultValue": "", "omitDefault": true },
     { "name": "label2", "label": "Right Label", "kind": "text", "defaultValue": "", "omitDefault": true },
     { "name": "subtype2", "label": "Right Type", "kind": "choice", "values": ["door", "window"], "defaultValue": "door", "omitDefault": true },
+    { "name": "icon2", "label": "Right Closed Icon", "kind": "text", "defaultValue": "", "omitDefault": true },
+    { "name": "icon_on2", "label": "Right Open Icon", "kind": "text", "defaultValue": "", "omitDefault": true },
     { "name": "active_color2", "label": "Right Lit When Open", "kind": "flag", "omitDefault": true }
   ],
   "normalization": {
@@ -27,7 +30,7 @@
       "options": { "policy": "hook", "hook": "normalize_occupancy_options" }
     },
     "unknownOptions": "drop",
-    "canonicalOptionOrder": ["active_color", "sensor2", "label2", "subtype2", "active_color2"],
+    "canonicalOptionOrder": ["active_color", "sides", "sensor2", "label2", "subtype2", "icon2", "icon_on2", "active_color2"],
     "optionHook": "normalize_occupancy_options"
   },
   "default": {

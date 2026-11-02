@@ -105,7 +105,7 @@
     }
   },
   {
-    "name": "door window keeps a second sensor in canonical order",
+    "name": "door window treats an older second sensor as both sides",
     "input": "binary_sensor.front_door;Front Door;Auto;Auto;binary_sensor.front_door;;door_window;door;active_color2,subtype2=window,junk=1,label2=Kitchen%2C Window,sensor2=binary_sensor.kitchen_window,active_color",
     "expected": {
       "entity": "",
@@ -116,7 +116,7 @@
       "unit": "",
       "type": "door_window",
       "precision": "door",
-      "options": "active_color,sensor2=binary_sensor.kitchen_window,label2=Kitchen%2C Window,subtype2=window,active_color2"
+      "options": "active_color,sides=both,sensor2=binary_sensor.kitchen_window,label2=Kitchen%2C Window,subtype2=window,active_color2"
     }
   },
   {
@@ -132,6 +132,51 @@
       "type": "door_window",
       "precision": "door",
       "options": ""
+    }
+  },
+  {
+    "name": "door window keeps right-only settings with custom icons",
+    "input": "binary_sensor.front_door;Front Door;Auto;Auto;;;door_window;door;icon_on2=Garage Open,sides=right,icon2=Garage,sensor2=binary_sensor.garage",
+    "expected": {
+      "entity": "",
+      "label": "Front Door",
+      "icon": "Door",
+      "icon_on": "Door Open",
+      "sensor": "",
+      "unit": "",
+      "type": "door_window",
+      "precision": "door",
+      "options": "sides=right,sensor2=binary_sensor.garage,icon2=Garage,icon_on2=Garage Open"
+    }
+  },
+  {
+    "name": "door window drops automatic right icons",
+    "input": "binary_sensor.front_door;Front Door;Auto;Auto;binary_sensor.front_door;;door_window;door;sides=both,sensor2=binary_sensor.kitchen_window,icon2=Auto,icon_on2=Auto",
+    "expected": {
+      "entity": "",
+      "label": "Front Door",
+      "icon": "Door",
+      "icon_on": "Door Open",
+      "sensor": "binary_sensor.front_door",
+      "unit": "",
+      "type": "door_window",
+      "precision": "door",
+      "options": "sides=both,sensor2=binary_sensor.kitchen_window"
+    }
+  },
+  {
+    "name": "door window left only drops right settings",
+    "input": "binary_sensor.front_door;Front Door;Auto;Auto;binary_sensor.front_door;;door_window;door;active_color,sides=left,sensor2=binary_sensor.kitchen_window,icon2=Garage,active_color2",
+    "expected": {
+      "entity": "",
+      "label": "Front Door",
+      "icon": "Door",
+      "icon_on": "Door Open",
+      "sensor": "binary_sensor.front_door",
+      "unit": "",
+      "type": "door_window",
+      "precision": "door",
+      "options": "active_color"
     }
   }
 ]

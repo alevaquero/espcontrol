@@ -1522,6 +1522,18 @@ export const CARD_CONTRACT_CARDS: Readonly<Record<string, CardTypeSpec>> = {
         "omitDefault": true
       },
       {
+        "name": "sides",
+        "label": "Show",
+        "kind": "choice",
+        "values": [
+          "left",
+          "right",
+          "both"
+        ],
+        "defaultValue": "left",
+        "omitDefault": true
+      },
+      {
         "name": "sensor2",
         "label": "Right Sensor Entity",
         "kind": "text",
@@ -1544,6 +1556,20 @@ export const CARD_CONTRACT_CARDS: Readonly<Record<string, CardTypeSpec>> = {
           "window"
         ],
         "defaultValue": "door",
+        "omitDefault": true
+      },
+      {
+        "name": "icon2",
+        "label": "Right Closed Icon",
+        "kind": "text",
+        "defaultValue": "",
+        "omitDefault": true
+      },
+      {
+        "name": "icon_on2",
+        "label": "Right Open Icon",
+        "kind": "text",
+        "defaultValue": "",
         "omitDefault": true
       },
       {
@@ -1591,9 +1617,12 @@ export const CARD_CONTRACT_CARDS: Readonly<Record<string, CardTypeSpec>> = {
       "unknownOptions": "drop",
       "canonicalOptionOrder": [
         "active_color",
+        "sides",
         "sensor2",
         "label2",
         "subtype2",
+        "icon2",
+        "icon_on2",
         "active_color2"
       ],
       "optionHook": "normalize_occupancy_options"
@@ -4964,7 +4993,9 @@ export const CARD_CONTRACT_OPTION_NAMES: Readonly<Record<string, string>> = {
   "garage_mode": "garage_mode",
   "gate_mode": "gate_mode",
   "hidden": "hidden",
+  "icon2": "icon2",
   "icon_display": "icon_display",
+  "icon_on2": "icon_on2",
   "image_icon": "image_icon",
   "image_label": "image_label",
   "image_modal_mode": "image_modal_mode",
@@ -4997,6 +5028,7 @@ export const CARD_CONTRACT_OPTION_NAMES: Readonly<Record<string, string>> = {
   "script_fields": "script_fields",
   "security": "security",
   "sensor2": "sensor2",
+  "sides": "sides",
   "speaker_group_entity": "speaker_group_entity",
   "ssid64": "ssid64",
   "state_entity": "state_entity",
