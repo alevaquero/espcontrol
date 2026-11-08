@@ -8,8 +8,14 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <string>
+#include <string_view>
 #include <vector>
+
+#ifdef ESP_PLATFORM
+#include "esp_heap_caps.h"
+#endif
 
 namespace espcontrol::media {
 
@@ -21,6 +27,9 @@ enum class LibraryKind : uint8_t {
 
 constexpr size_t LIBRARY_KIND_COUNT = 3;
 constexpr size_t LIBRARY_PAGE_SIZE = 50;
+// Larger pages while catching up to a tapped letter, so a jump near the end
+// of a long library needs fewer round trips.
+constexpr size_t LIBRARY_JUMP_PAGE_SIZE = 200;
 // Request the next page once the visible rows come this close to the end.
 constexpr size_t LIBRARY_PREFETCH_ROWS = 10;
 constexpr uint32_t LIBRARY_REQUEST_TIMEOUT_MS = 15000;
@@ -45,14 +54,45 @@ inline const char *library_icon_name(LibraryKind kind) {
   return "Playlist Music";
 }
 
-struct LibraryItem {
-  std::string name;
-  std::string uri;
+// Library entries live in PSRAM. Plain allocations on the panels only use
+// the small internal heap, where a few thousand entries do not fit.
+template<typename T>
+struct LibraryAllocator {
+  using value_type = T;
+  LibraryAllocator() noexcept = default;
+  template<typename U>
+  LibraryAllocator(const LibraryAllocator<U> &) noexcept {}
+
+  T *allocate(size_t count) {
+    const size_t bytes = count * sizeof(T);
+    void *result = nullptr;
+#ifdef ESP_PLATFORM
+    result = heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+#endif
+    if (result == nullptr) result = std::malloc(bytes);
+    if (result == nullptr && bytes != 0) std::abort();
+    return static_cast<T *>(result);
+  }
+  void deallocate(T *pointer, size_t) noexcept { std::free(pointer); }
+
+  template<typename U>
+  bool operator==(const LibraryAllocator<U> &) const noexcept { return true; }
+  template<typename U>
+  bool operator!=(const LibraryAllocator<U> &) const noexcept { return false; }
 };
+
+using LibraryString = std::basic_string<char, std::char_traits<char>, LibraryAllocator<char>>;
+
+struct LibraryItem {
+  LibraryString name;
+  LibraryString uri;
+};
+
+using LibraryItems = std::vector<LibraryItem, LibraryAllocator<LibraryItem>>;
 
 // Loaded entries for one library kind of one media player.
 struct LibraryList {
-  std::vector<LibraryItem> items;
+  LibraryItems items;
   bool loading = false;
   bool complete = false;
   bool failed = false;
@@ -90,7 +130,7 @@ inline const char *library_response_template() {
 // Appends the entries of one rendered page. Lines without a URI are skipped.
 // Returns how many lines the page contained, including skipped ones, so the
 // caller can tell whether Music Assistant returned a full page.
-inline size_t library_parse_page(const char *payload, std::vector<LibraryItem> &out,
+inline size_t library_parse_page(const char *payload, LibraryItems &out,
                                  size_t max_items) {
   if (!payload) return 0;
   size_t lines = 0;
@@ -103,11 +143,11 @@ inline size_t library_parse_page(const char *payload, std::vector<LibraryItem> &
     if (end > line) {
       ++lines;
       if (tab < end) {
-        std::string name(line, tab - line);
-        std::string uri(tab + 1, end - tab - 1);
+        LibraryString name(line, tab - line);
+        LibraryString uri(tab + 1, end - tab - 1);
         while (!uri.empty() && (uri.back() == '\r' || uri.back() == ' ')) uri.pop_back();
         const size_t first = name.find_first_not_of(' ');
-        name = first == std::string::npos ? std::string() : name.substr(first);
+        name = first == LibraryString::npos ? LibraryString() : name.substr(first);
         while (!name.empty() && name.back() == ' ') name.pop_back();
         if (!uri.empty() && out.size() < max_items) {
           out.push_back({name.empty() ? uri : name, uri});
@@ -119,10 +159,11 @@ inline size_t library_parse_page(const char *payload, std::vector<LibraryItem> &
   return lines;
 }
 
-// Home Assistant trims the rendered template, so a short page means the end of
-// the library. A page may also come back short when it hits the memory cap.
-inline bool library_page_complete(size_t page_lines, size_t loaded, size_t max_items) {
-  return page_lines < LIBRARY_PAGE_SIZE || loaded >= max_items;
+// Home Assistant trims the rendered template, so a page shorter than the one
+// requested means the end of the library. Loading also stops at the cap.
+inline bool library_page_complete(size_t page_lines, size_t page_size, size_t loaded,
+                                  size_t max_items) {
+  return page_lines < page_size || loaded >= max_items;
 }
 
 inline bool library_should_fetch_more(const LibraryList &list, size_t last_visible_index,
@@ -143,15 +184,15 @@ inline size_t library_first_visible(int scroll_y, int row_pitch, size_t count) {
 // matching how Music Assistant sorts names.
 constexpr const char *LIBRARY_INDEX_KEYS = "#ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-inline char library_index_key(const std::string &name) {
+inline char library_index_key(std::string_view name) {
   size_t start = name.find_first_not_of(' ');
-  if (start == std::string::npos) return '#';
+  if (start == std::string_view::npos) return '#';
   if (name.size() > start + 4) {
     const char t = name[start], h = name[start + 1], e = name[start + 2];
     if ((t == 'T' || t == 't') && (h == 'H' || h == 'h') && (e == 'E' || e == 'e') &&
         name[start + 3] == ' ') {
       const size_t next = name.find_first_not_of(' ', start + 4);
-      if (next != std::string::npos) start = next;
+      if (next != std::string_view::npos) start = next;
     }
   }
   const char ch = name[start];
@@ -167,7 +208,7 @@ inline int library_index_rank(char key) {
 
 // First loaded entry at or after the key, or -1 if every loaded entry comes
 // before it (more pages may still need loading).
-inline int library_index_find(const std::vector<LibraryItem> &items, char key) {
+inline int library_index_find(const LibraryItems &items, char key) {
   const int target = library_index_rank(key);
   for (size_t i = 0; i < items.size(); ++i) {
     if (library_index_rank(library_index_key(items[i].name)) >= target) return static_cast<int>(i);

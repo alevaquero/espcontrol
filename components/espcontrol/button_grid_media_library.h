@@ -62,7 +62,7 @@ inline void media_library_render(MediaControlCtx *ctx);
 
 inline void media_library_handle_response(const std::string &entity_id,
                                           espcontrol::media::LibraryKind kind,
-                                          uint32_t call_id, size_t offset,
+                                          uint32_t call_id, size_t offset, size_t limit,
                                           const esphome::api::ActionResponse &response) {
   espcontrol::media::LibraryList &list = media_library_list(entity_id, kind);
   if (list.call_id != call_id) return;
@@ -82,7 +82,7 @@ inline void media_library_handle_response(const std::string &entity_id,
       const size_t lines = espcontrol::media::library_parse_page(
         payload ? payload : "", list.items, MEDIA_LIBRARY_MAX_ITEMS);
       list.complete = espcontrol::media::library_page_complete(
-        lines, list.items.size(), MEDIA_LIBRARY_MAX_ITEMS);
+        lines, limit, list.items.size(), MEDIA_LIBRARY_MAX_ITEMS);
       list.failed = false;
       list.loaded_ms = esphome::millis();
       ESP_LOGI("media_library", "Loaded %u %s entries for %s (total %u%s)",
@@ -95,7 +95,8 @@ inline void media_library_handle_response(const std::string &entity_id,
 }
 
 inline void media_library_request(const std::string &entity_id,
-                                  espcontrol::media::LibraryKind kind, size_t offset) {
+                                  espcontrol::media::LibraryKind kind, size_t offset,
+                                  size_t limit = espcontrol::media::LIBRARY_PAGE_SIZE) {
   espcontrol::media::LibraryList &list = media_library_list(entity_id, kind);
   if (list.loading) return;
   list.failed = true;
@@ -110,16 +111,16 @@ inline void media_library_request(const std::string &entity_id,
   // Templates render to numbers, which the action's schema expects. The
   // config entry is the Music Assistant instance that owns this player.
   const std::string config_entry = espcontrol::media::library_config_entry_template(entity_id);
-  const std::string limit = "{{ " + std::to_string(espcontrol::media::LIBRARY_PAGE_SIZE) + " }}";
+  const std::string limit_template = "{{ " + std::to_string(limit) + " }}";
   const std::string offset_template = "{{ " + std::to_string(offset) + " }}";
   req.data_template.init(3);
   ha_action_add_data_template(req, "config_entry_id", config_entry.c_str());
-  ha_action_add_data_template(req, "limit", limit.c_str());
+  ha_action_add_data_template(req, "limit", limit_template.c_str());
   ha_action_add_data_template(req, "offset", offset_template.c_str());
   if (!ha_register_action_response_callback(
         call_id,
-        [entity_id, kind, call_id, offset](const esphome::api::ActionResponse &response) {
-          media_library_handle_response(entity_id, kind, call_id, offset, response);
+        [entity_id, kind, call_id, offset, limit](const esphome::api::ActionResponse &response) {
+          media_library_handle_response(entity_id, kind, call_id, offset, limit, response);
         })) return;
   list.loading = true;
   list.failed = false;
@@ -185,7 +186,9 @@ inline void media_library_render(MediaControlCtx *ctx) {
       // rest of this pass then places rows for the new position anyway.
       lv_obj_scroll_to_y(ui.library_list, y, LV_ANIM_OFF);
     } else if (!list.loading) {
-      media_library_request(ctx->entity_id, kind, count);
+      const size_t room = MEDIA_LIBRARY_MAX_ITEMS - count;
+      media_library_request(ctx->entity_id, kind, count,
+        room < espcontrol::media::LIBRARY_JUMP_PAGE_SIZE ? room : espcontrol::media::LIBRARY_JUMP_PAGE_SIZE);
     }
   }
 
@@ -254,7 +257,7 @@ inline void media_library_play(MediaControlCtx *ctx, size_t index) {
   const auto kind = media_library_kind_for_tab(ui.tab);
   espcontrol::media::LibraryList &list = media_library_list(ctx->entity_id, kind);
   if (index >= list.items.size()) return;
-  const std::string uri = list.items[index].uri;
+  const std::string uri(list.items[index].uri.data(), list.items[index].uri.size());
   ESP_LOGI("media_library", "Playing %s %s on %s", espcontrol::media::library_media_type(kind),
            uri.c_str(), ctx->entity_id.c_str());
   esphome::api::HomeassistantActionRequest req;

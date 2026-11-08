@@ -5,7 +5,7 @@
 
 int main() {
   using namespace espcontrol::media;
-  std::vector<LibraryItem> items;
+  LibraryItems items;
 
   // Rendered pages are "name<TAB>uri" lines; Home Assistant trims the end.
   size_t lines = library_parse_page(
@@ -20,11 +20,14 @@ int main() {
   assert(library_parse_page("", items, 100) == 0 && library_parse_page(nullptr, items, 100) == 0);
 
   // The memory cap stops appending but still counts the page.
-  std::vector<LibraryItem> capped;
+  LibraryItems capped;
   assert(library_parse_page("a\tu1\nb\tu2\nc\tu3", capped, 2) == 3 && capped.size() == 2);
-  assert(library_page_complete(3, 2, 2));
-  assert(library_page_complete(LIBRARY_PAGE_SIZE - 1, 10, 1000));
-  assert(!library_page_complete(LIBRARY_PAGE_SIZE, LIBRARY_PAGE_SIZE, 1000));
+  assert(library_page_complete(3, LIBRARY_PAGE_SIZE, 2, 2));
+  assert(library_page_complete(LIBRARY_PAGE_SIZE - 1, LIBRARY_PAGE_SIZE, 10, 1000));
+  assert(!library_page_complete(LIBRARY_PAGE_SIZE, LIBRARY_PAGE_SIZE, LIBRARY_PAGE_SIZE, 1000));
+  // A full jump page is not the end, even though it is longer than a normal page.
+  assert(!library_page_complete(LIBRARY_JUMP_PAGE_SIZE, LIBRARY_JUMP_PAGE_SIZE, 250, 3000));
+  assert(library_page_complete(LIBRARY_JUMP_PAGE_SIZE - 1, LIBRARY_JUMP_PAGE_SIZE, 250, 3000));
 
   LibraryList list;
   list.items.resize(LIBRARY_PAGE_SIZE);
@@ -62,7 +65,7 @@ int main() {
   assert(library_index_key("The") == 'T');
   assert(library_index_key("  2Pac") == '#');
   assert(library_index_key("") == '#');
-  std::vector<LibraryItem> artists = {
+  LibraryItems artists = {
     {"10cc", "u0"}, {"ABBA", "u1"}, {"The Beatles", "u2"}, {"Coldplay", "u3"},
     {"Daft Punk", "u4"}, {"Hozier", "u5"},
   };
