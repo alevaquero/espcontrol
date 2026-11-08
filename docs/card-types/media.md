@@ -55,9 +55,11 @@ If the main player becomes unavailable, you can still open the popup to use the 
 
 If the card's player comes from [Music Assistant](https://www.home-assistant.io/integrations/music_assistant/), switch on the **Playlists**, **Artists**, or **Radios** tabs in **Modal Settings** to browse your Music Assistant library from the popup. They are off by default.
 
-- Each tab lists that part of your library. More entries load as you scroll, up to 3,000 per tab (200 on ESP32-S3 panels).
+- Each tab lists that part of your library, up to 3,000 entries per tab (200 on ESP32-S3 panels). The first entries appear straight away and the rest load in the background.
+- **All**, **Favorites**, and **Recent** above the list choose what the tab shows: the whole library, only your Music Assistant favorites, or the 50 entries you played most recently.
 - Tap an entry to play it on the card's player. The popup then returns to the Controls tab.
-- Each tab has letter keys beside the list. Tap a letter to jump to the first entry starting with it, then scroll up or down from there. Names starting with "The" are filed under the next word, and **#** covers names that start with a number or symbol.
+- Use the letter keys beside the list to jump through it. Tap **A** to jump to names starting with A, then **N** to narrow it to names starting with "An". The letters you typed are lit and shown after **Z**, and they clear 3 seconds after your last tap; the list stays where it landed. Tap the delete key to remove the last letter, or hold it to clear them all.
+- Keys that would not lead to any name are dimmed. Names follow Music Assistant's order: accents are ignored, and a leading word such as "The" or "A" is skipped, so "The Beatles" is under B. **#** covers names that start with a number or symbol. Letter keys are not used in Recent.
 - The list is kept while the panel is running and is refreshed when you open the tab again after 10 minutes.
 
 The panel finds your Music Assistant setup from the card's player, so there is nothing else to enter. The card's entity must be a Music Assistant player, such as the `media_player` entities the Music Assistant integration creates. If the tab shows **Could not load**, check that the entity belongs to Music Assistant and that the panel is allowed to perform Home Assistant actions.
