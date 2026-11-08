@@ -39,11 +39,32 @@ inline MediaControlTab media_library_tab_for_kind(espcontrol::media::LibraryKind
   return MediaControlTab::PLAYLISTS;
 }
 
+// The All / Favorites / Recent choice of each tab, kept while the panel runs.
+inline espcontrol::media::LibraryFilter &media_library_filter(espcontrol::media::LibraryKind kind) {
+  static std::array<espcontrol::media::LibraryFilter, espcontrol::media::LIBRARY_KIND_COUNT> filters{};
+  return filters[static_cast<size_t>(kind)];
+}
+
+// Recent only shows the most recently played page.
+inline size_t media_library_max_items(espcontrol::media::LibraryFilter filter) {
+  return espcontrol::media::library_filter_alphabetical(filter) ? MEDIA_LIBRARY_MAX_ITEMS
+                                                                : espcontrol::media::LIBRARY_PAGE_SIZE;
+}
+
 inline espcontrol::media::LibraryList &media_library_list(
-    const std::string &entity_id, espcontrol::media::LibraryKind kind) {
-  static std::map<std::string, std::array<espcontrol::media::LibraryList,
-                                          espcontrol::media::LIBRARY_KIND_COUNT>> lists;
-  return lists[entity_id][static_cast<size_t>(kind)];
+    const std::string &entity_id, espcontrol::media::LibraryKind kind,
+    espcontrol::media::LibraryFilter filter) {
+  using Lists = std::array<espcontrol::media::LibraryList,
+                           espcontrol::media::LIBRARY_KIND_COUNT * espcontrol::media::LIBRARY_FILTER_COUNT>;
+  static std::map<std::string, Lists> lists;
+  return lists[entity_id][static_cast<size_t>(kind) * espcontrol::media::LIBRARY_FILTER_COUNT +
+                          static_cast<size_t>(filter)];
+}
+
+// The list the open tab shows.
+inline espcontrol::media::LibraryList &media_library_shown_list(MediaControlCtx *ctx) {
+  const auto kind = media_library_kind_for_tab(media_control_modal_ui().tab);
+  return media_library_list(ctx->entity_id, kind, media_library_filter(kind));
 }
 
 inline uint32_t next_media_library_call_id() {
@@ -52,19 +73,21 @@ inline uint32_t next_media_library_call_id() {
 }
 
 inline bool media_library_tab_shows(const std::string &entity_id,
-                                    espcontrol::media::LibraryKind kind) {
+                                    espcontrol::media::LibraryKind kind,
+                                    espcontrol::media::LibraryFilter filter) {
   const MediaControlModalUi &ui = media_control_modal_ui();
   return ui.active && ui.library_list && ui.active->entity_id == entity_id &&
-         ui.tab == media_library_tab_for_kind(kind);
+         ui.tab == media_library_tab_for_kind(kind) && media_library_filter(kind) == filter;
 }
 
 inline void media_library_render(MediaControlCtx *ctx);
 
 inline void media_library_handle_response(const std::string &entity_id,
                                           espcontrol::media::LibraryKind kind,
+                                          espcontrol::media::LibraryFilter filter,
                                           uint32_t call_id, size_t offset, size_t limit,
                                           const esphome::api::ActionResponse &response) {
-  espcontrol::media::LibraryList &list = media_library_list(entity_id, kind);
+  espcontrol::media::LibraryList &list = media_library_list(entity_id, kind, filter);
   if (list.call_id != call_id) return;
   list.loading = false;
   list.call_id = 0;
@@ -79,10 +102,11 @@ inline void media_library_handle_response(const std::string &entity_id,
     if (offset == 0) list.items.clear();
     // A page for an older position (the list was reset meanwhile) is dropped.
     if (offset == list.items.size()) {
+      const size_t max_items = media_library_max_items(filter);
       const size_t lines = espcontrol::media::library_parse_page(
-        payload ? payload : "", list.items, MEDIA_LIBRARY_MAX_ITEMS);
+        payload ? payload : "", list.items, max_items);
       list.complete = espcontrol::media::library_page_complete(
-        lines, limit, list.items.size(), MEDIA_LIBRARY_MAX_ITEMS);
+        lines, limit, list.items.size(), max_items);
       list.failed = false;
       list.loaded_ms = esphome::millis();
       ESP_LOGI("media_library", "Loaded %u %s entries for %s (total %u%s)",
@@ -91,36 +115,41 @@ inline void media_library_handle_response(const std::string &entity_id,
                list.complete ? ", complete" : "");
     }
   }
-  if (media_library_tab_shows(entity_id, kind)) media_library_render(media_control_modal_ui().active);
+  if (media_library_tab_shows(entity_id, kind, filter)) media_library_render(media_control_modal_ui().active);
 }
 
 inline void media_library_request(const std::string &entity_id,
-                                  espcontrol::media::LibraryKind kind, size_t offset,
-                                  size_t limit = espcontrol::media::LIBRARY_PAGE_SIZE) {
-  espcontrol::media::LibraryList &list = media_library_list(entity_id, kind);
+                                  espcontrol::media::LibraryKind kind,
+                                  espcontrol::media::LibraryFilter filter, size_t offset,
+                                  size_t limit) {
+  espcontrol::media::LibraryList &list = media_library_list(entity_id, kind, filter);
   if (list.loading) return;
   list.failed = true;
   if (!espcontrol::media::library_entity_id_safe(entity_id)) return;
   esphome::api::HomeassistantActionRequest req;
   const uint32_t call_id = next_media_library_call_id();
-  if (!ha_action_begin(req, "music_assistant.get_library", false, 1, call_id)) return;
+  const bool favorites = filter == espcontrol::media::LibraryFilter::FAVORITES;
+  if (!ha_action_begin(req, "music_assistant.get_library", false, favorites ? 3 : 2, call_id)) return;
   req.wants_response = true;
   req.response_template = decltype(req.response_template)(
     espcontrol::media::library_response_template());
   ha_action_add_data(req, "media_type", espcontrol::media::library_media_type(kind));
-  // Templates render to numbers, which the action's schema expects. The
-  // config entry is the Music Assistant instance that owns this player.
+  ha_action_add_data(req, "order_by", espcontrol::media::library_order_by(filter));
+  // Templates render to numbers and booleans, which the action's schema
+  // expects. The config entry is the Music Assistant instance that owns this
+  // player.
   const std::string config_entry = espcontrol::media::library_config_entry_template(entity_id);
   const std::string limit_template = "{{ " + std::to_string(limit) + " }}";
   const std::string offset_template = "{{ " + std::to_string(offset) + " }}";
-  req.data_template.init(3);
+  req.data_template.init(favorites ? 4 : 3);
   ha_action_add_data_template(req, "config_entry_id", config_entry.c_str());
   ha_action_add_data_template(req, "limit", limit_template.c_str());
   ha_action_add_data_template(req, "offset", offset_template.c_str());
+  if (favorites) ha_action_add_data_template(req, "favorite", "{{ true }}");
   if (!ha_register_action_response_callback(
         call_id,
-        [entity_id, kind, call_id, offset, limit](const esphome::api::ActionResponse &response) {
-          media_library_handle_response(entity_id, kind, call_id, offset, limit, response);
+        [entity_id, kind, filter, call_id, offset, limit](const esphome::api::ActionResponse &response) {
+          media_library_handle_response(entity_id, kind, filter, call_id, offset, limit, response);
         })) return;
   list.loading = true;
   list.failed = false;
@@ -158,6 +187,47 @@ inline void media_library_set_status(const char *text) {
   lv_obj_clear_flag(ui.library_status_lbl, LV_OBJ_FLAG_HIDDEN);
 }
 
+inline void media_library_set_state(lv_obj_t *obj, lv_state_t state, bool on) {
+  if (!obj || lv_obj_has_state(obj, state) == on) return;
+  if (on) lv_obj_add_state(obj, state);
+  else lv_obj_clear_state(obj, state);
+}
+
+// Dims keys that cannot lead to an entry, lights the typed letters, and shows
+// the typed prefix. Work is skipped while nothing that affects it changed.
+inline void media_library_update_keys(espcontrol::media::LibraryFilter filter,
+                                      const espcontrol::media::LibraryList &list) {
+  MediaControlModalUi &ui = media_control_modal_ui();
+  if (!ui.library_index) return;
+  if (ui.library_keys_count != list.items.size() || ui.library_keys_complete != list.complete) {
+    ui.library_keys_enabled = UINT32_MAX;  // recompute below
+  }
+  if (ui.library_keys_enabled == UINT32_MAX) {
+    ui.library_keys_count = list.items.size();
+    ui.library_keys_complete = list.complete;
+    uint32_t enabled = 0;
+    if (espcontrol::media::library_filter_alphabetical(filter) &&
+        ui.library_prefix.size() < espcontrol::media::LIBRARY_PREFIX_MAX) {
+      enabled = espcontrol::media::library_next_keys(list.items, ui.library_prefix, list.complete);
+    }
+    // Keep the value distinct from the "recompute" marker.
+    ui.library_keys_enabled = enabled & ((1u << espcontrol::media::LIBRARY_INDEX_KEY_COUNT) - 1);
+    for (size_t i = 0; i < espcontrol::media::LIBRARY_INDEX_KEY_COUNT; ++i) {
+      media_library_set_state(ui.library_keys[i], LV_STATE_DISABLED, !(ui.library_keys_enabled & (1u << i)));
+    }
+  }
+  uint32_t lit = 0;
+  for (char ch : ui.library_prefix) lit |= 1u << espcontrol::media::library_key_rank(ch);
+  if (lit != ui.library_keys_lit) {
+    ui.library_keys_lit = lit;
+    for (size_t i = 0; i < espcontrol::media::LIBRARY_INDEX_KEY_COUNT; ++i) {
+      media_library_set_state(ui.library_keys[i], LV_STATE_CHECKED, lit & (1u << i));
+    }
+    if (ui.library_prefix_lbl) lv_label_set_text(ui.library_prefix_lbl, ui.library_prefix.c_str());
+    media_library_set_state(ui.library_delete_btn, LV_STATE_DISABLED, ui.library_prefix.empty());
+  }
+}
+
 // Place the row pool over the entries around the current scroll position.
 // Rows are only relabelled and restyled when they move to a different entry
 // or the entry being started changes, so plain scrolling stays cheap.
@@ -165,18 +235,19 @@ inline void media_library_render(MediaControlCtx *ctx) {
   MediaControlModalUi &ui = media_control_modal_ui();
   if (!ctx || ui.active != ctx || !ui.library_list || ui.library_row_pitch <= 0) return;
   const auto kind = media_library_kind_for_tab(ui.tab);
-  espcontrol::media::LibraryList &list = media_library_list(ctx->entity_id, kind);
+  const auto filter = media_library_filter(kind);
+  const size_t max_items = media_library_max_items(filter);
+  espcontrol::media::LibraryList &list = media_library_list(ctx->entity_id, kind, filter);
   const size_t count = list.items.size();
   const lv_coord_t pitch = ui.library_row_pitch;
   const lv_coord_t gap = pitch - ui.library_row_h;
   const lv_coord_t total_h = count ? static_cast<lv_coord_t>(count) * pitch - gap : 0;
   if (lv_obj_get_height(ui.library_spacer) != total_h) lv_obj_set_height(ui.library_spacer, total_h);
-  if (ui.library_pending_key) {
-    const int index = espcontrol::media::library_index_find(list.items, ui.library_pending_key);
-    if (index >= 0 || list.complete || list.failed ||
-        count >= MEDIA_LIBRARY_MAX_ITEMS) {
+  if (ui.library_jump_pending) {
+    const int index = espcontrol::media::library_prefix_find(list.items, ui.library_jump_target);
+    if (index >= 0 || list.complete || list.failed || count >= max_items) {
       // Found, or nothing later exists: show the match, else the last entry.
-      ui.library_pending_key = 0;
+      ui.library_jump_pending = false;
       const size_t target = index >= 0 ? static_cast<size_t>(index) : (count ? count - 1 : 0);
       lv_obj_update_layout(ui.library_list);
       const lv_coord_t max_y = total_h - lv_obj_get_content_height(ui.library_list);
@@ -185,10 +256,6 @@ inline void media_library_render(MediaControlCtx *ctx) {
       // A real scroll re-enters this function through LV_EVENT_SCROLL; the
       // rest of this pass then places rows for the new position anyway.
       lv_obj_scroll_to_y(ui.library_list, y, LV_ANIM_OFF);
-    } else if (!list.loading) {
-      const size_t room = MEDIA_LIBRARY_MAX_ITEMS - count;
-      media_library_request(ctx->entity_id, kind, count,
-        room < espcontrol::media::LIBRARY_JUMP_PAGE_SIZE ? room : espcontrol::media::LIBRARY_JUMP_PAGE_SIZE);
     }
   }
 
@@ -220,16 +287,37 @@ inline void media_library_render(MediaControlCtx *ctx) {
   }
 
   if (ui.library_play_failed) media_library_set_status(espcontrol_i18n("Playback failed"));
-  else if (ui.library_pending_key) media_library_set_status(espcontrol_i18n("Loading"));
+  else if (ui.library_jump_pending) media_library_set_status(espcontrol_i18n("Loading"));
   else if (count) media_library_set_status(nullptr);
   else if (list.loading) media_library_set_status(espcontrol_i18n("Loading"));
   else if (list.failed) media_library_set_status(espcontrol_i18n("Could not load"));
   else media_library_set_status(espcontrol_i18n("Nothing found"));
 
-  const lv_coord_t list_h = lv_obj_get_height(ui.library_list);
-  const size_t visible = list_h > 0 ? static_cast<size_t>(list_h / pitch) + 1 : ui.library_rows.size();
-  if (espcontrol::media::library_should_fetch_more(list, first + visible, MEDIA_LIBRARY_MAX_ITEMS)) {
-    media_library_request(ctx->entity_id, kind, count);
+  media_library_update_keys(filter, list);
+
+  // Keep loading in the background so the letter keys know every entry. The
+  // first page is small so the list appears quickly.
+  if (espcontrol::media::library_should_load_more(list, max_items)) {
+    const size_t room = max_items - count;
+    const size_t page = count == 0 ? espcontrol::media::LIBRARY_PAGE_SIZE
+                                   : espcontrol::media::LIBRARY_BULK_PAGE_SIZE;
+    media_library_request(ctx->entity_id, kind, filter, count, room < page ? room : page);
+  }
+}
+
+// Starts loading the shown list when it is missing, failed, or out of date.
+inline void media_library_open_list(MediaControlCtx *ctx) {
+  const auto kind = media_library_kind_for_tab(media_control_modal_ui().tab);
+  const auto filter = media_library_filter(kind);
+  espcontrol::media::LibraryList &list = media_library_list(ctx->entity_id, kind, filter);
+  media_library_expire_request(list);
+  const uint32_t now = esphome::millis();
+  const bool stale = list.loaded_ms != 0 &&
+    now - list.loaded_ms >= espcontrol::media::LIBRARY_STALE_MS;
+  if (!list.loading && (list.failed || stale || (list.items.empty() && !list.complete))) {
+    list.complete = false;
+    list.failed = false;
+    media_library_request(ctx->entity_id, kind, filter, 0, espcontrol::media::LIBRARY_PAGE_SIZE);
   }
 }
 
@@ -255,7 +343,7 @@ inline void media_library_play_result(const std::string &entity_id, uint32_t cal
 inline void media_library_play(MediaControlCtx *ctx, size_t index) {
   MediaControlModalUi &ui = media_control_modal_ui();
   const auto kind = media_library_kind_for_tab(ui.tab);
-  espcontrol::media::LibraryList &list = media_library_list(ctx->entity_id, kind);
+  espcontrol::media::LibraryList &list = media_library_shown_list(ctx);
   if (index >= list.items.size()) return;
   const std::string uri(list.items[index].uri.data(), list.items[index].uri.size());
   ESP_LOGI("media_library", "Playing %s %s on %s", espcontrol::media::library_media_type(kind),
@@ -291,10 +379,17 @@ inline void media_library_timer_cb(lv_timer_t *) {
   MediaControlModalUi &ui = media_control_modal_ui();
   MediaControlCtx *ctx = ui.active;
   if (!ctx || !ui.library_list) return;
-  media_library_expire_request(media_library_list(ctx->entity_id, media_library_kind_for_tab(ui.tab)));
+  media_library_expire_request(media_library_shown_list(ctx));
   if (ui.library_play_call_id != 0 &&
       esphome::millis() - ui.library_play_ms >= espcontrol::media::LIBRARY_REQUEST_TIMEOUT_MS) {
     ha_cancel_action_response_callback(ui.library_play_call_id, "timeout");
+  }
+  // Typed letters are forgotten after a pause; the list stays where it is.
+  if (!ui.library_prefix.empty() &&
+      esphome::millis() - ui.library_prefix_ms >= espcontrol::media::LIBRARY_PREFIX_TIMEOUT_MS) {
+    ui.library_prefix.clear();
+    ui.library_keys_enabled = UINT32_MAX;
+    media_library_render(ctx);
   }
 }
 
@@ -337,8 +432,73 @@ inline lv_obj_t *media_library_create_row(MediaControlCtx *ctx, lv_obj_t *parent
   return row;
 }
 
-// Letter keys beside the library list. Tapping one scrolls to the first
-// entry at or after that letter, loading further pages first if needed.
+// Key styling: lit (checked) keys use the accent colour, keys that cannot
+// lead to an entry are dimmed and ignore taps. The label inherits its text
+// colour from the key, so state changes recolour it too.
+inline lv_obj_t *media_library_create_key(MediaControlCtx *ctx, lv_obj_t *parent,
+                                          lv_coord_t width_pct) {
+  const ThemePalette &theme = current_theme();
+  const uint32_t surface = theme_display_color(theme.surface_primary);
+  lv_obj_t *btn = lv_btn_create(parent);
+  lv_obj_set_size(btn, LV_PCT(width_pct), LV_PCT(15));
+  lv_obj_set_style_radius(btn, control_modal_card_radius(ctx->btn), LV_PART_MAIN);
+  lv_obj_set_style_border_width(btn, 0, LV_PART_MAIN);
+  lv_obj_set_style_shadow_width(btn, 0, LV_PART_MAIN);
+  lv_obj_set_style_pad_all(btn, 0, LV_PART_MAIN);
+  lv_obj_set_style_bg_color(btn, lv_color_hex(surface), LV_PART_MAIN);
+  lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
+  lv_obj_set_style_text_color(btn, lv_color_hex(theme.text_primary), LV_PART_MAIN);
+  control_modal_apply_pressed_fill(btn);
+  const auto checked = static_cast<lv_style_selector_t>(LV_PART_MAIN) |
+                       static_cast<lv_style_selector_t>(LV_STATE_CHECKED);
+  lv_obj_set_style_bg_color(btn, lv_color_hex(ctx->accent_color), checked);
+  lv_obj_set_style_text_color(btn, lv_color_hex(readable_text_color_for_bg(ctx->accent_color)), checked);
+  const auto disabled = static_cast<lv_style_selector_t>(LV_PART_MAIN) |
+                        static_cast<lv_style_selector_t>(LV_STATE_DISABLED);
+  lv_obj_set_style_bg_opa(btn, LV_OPA_40, disabled);
+  lv_obj_set_style_text_color(btn, lv_color_hex(theme.text_muted), disabled);
+  return btn;
+}
+
+inline lv_obj_t *media_library_create_key_label(lv_obj_t *btn, const lv_font_t *font, const char *text) {
+  lv_obj_t *label = lv_label_create(btn);
+  lv_label_set_text(label, text);
+  if (font) lv_obj_set_style_text_font(label, font, LV_PART_MAIN);
+  lv_obj_center(label);
+  return label;
+}
+
+inline void media_library_type_key(char key) {
+  MediaControlModalUi &ui = media_control_modal_ui();
+  if (!ui.active || !ui.library_list ||
+      ui.library_prefix.size() >= espcontrol::media::LIBRARY_PREFIX_MAX) return;
+  ui.library_prefix.push_back(key);
+  ui.library_prefix_ms = esphome::millis();
+  ui.library_jump_target = ui.library_prefix;
+  ui.library_jump_pending = true;
+  ui.library_keys_enabled = UINT32_MAX;
+  media_library_render(ui.active);
+}
+
+// Removes the last typed letter and jumps back to the shorter prefix, or
+// clears every letter on a long press.
+inline void media_library_delete_key(bool all) {
+  MediaControlModalUi &ui = media_control_modal_ui();
+  if (!ui.active || !ui.library_list || ui.library_prefix.empty()) return;
+  if (all) ui.library_prefix.clear();
+  else ui.library_prefix.pop_back();
+  ui.library_prefix_ms = esphome::millis();
+  ui.library_keys_enabled = UINT32_MAX;
+  if (!ui.library_prefix.empty()) {
+    ui.library_jump_target = ui.library_prefix;
+    ui.library_jump_pending = true;
+  }
+  media_library_render(ui.active);
+}
+
+// Letter keys beside the library list, with the typed letters and a delete
+// key after Z. Tapping keys in a row builds a prefix ("A", then "AN"); the
+// list scrolls to the first entry starting with it.
 inline void media_library_create_index(MediaControlCtx *ctx, lv_obj_t *parent) {
   MediaControlModalUi &ui = media_control_modal_ui();
   ui.library_index = lv_obj_create(parent);
@@ -355,36 +515,101 @@ inline void media_library_create_index(MediaControlCtx *ctx, lv_obj_t *parent) {
   lv_obj_set_style_flex_main_place(index, LV_FLEX_ALIGN_START, LV_PART_MAIN);
   lv_obj_set_style_flex_track_place(index, LV_FLEX_ALIGN_START, LV_PART_MAIN);
   lv_obj_clear_flag(index, LV_OBJ_FLAG_SCROLLABLE);
-  // 27 keys in 5 columns by 6 rows.
-  for (const char *key = espcontrol::media::LIBRARY_INDEX_KEYS; *key; ++key) {
-    lv_obj_t *btn = lv_btn_create(index);
-    lv_obj_set_size(btn, LV_PCT(18), LV_PCT(15));
-    lv_obj_set_style_radius(btn, control_modal_card_radius(ctx->btn), LV_PART_MAIN);
-    lv_obj_set_style_border_width(btn, 0, LV_PART_MAIN);
-    lv_obj_set_style_shadow_width(btn, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(btn, 0, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(btn, lv_color_hex(theme_display_color(current_theme().surface_primary)), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
-    control_modal_apply_pressed_fill(btn);
-    lv_obj_t *label = lv_label_create(btn);
-    const char text[2] = {*key, 0};
-    lv_label_set_text(label, text);
-    if (ctx->label_font) lv_obj_set_style_text_font(label, ctx->label_font, LV_PART_MAIN);
-    lv_obj_set_style_text_color(label, lv_color_hex(current_theme().text_primary), LV_PART_MAIN);
-    lv_obj_center(label);
+  // 27 keys in 5 columns by 6 rows; the last row ends with the typed letters
+  // and the delete key.
+  for (size_t i = 0; i < espcontrol::media::LIBRARY_INDEX_KEY_COUNT; ++i) {
+    const char key = espcontrol::media::LIBRARY_INDEX_KEYS[i];
+    lv_obj_t *btn = media_library_create_key(ctx, index, 18);
+    ui.library_keys[i] = btn;
+    const char text[2] = {key, 0};
+    media_library_create_key_label(btn, ctx->label_font, text);
     lv_obj_add_event_cb(btn, [](lv_event_t *event) {
-      MediaControlModalUi &ui = media_control_modal_ui();
-      if (!ui.active || !ui.library_list) return;
-      ui.library_pending_key = static_cast<char>(reinterpret_cast<uintptr_t>(lv_event_get_user_data(event)));
-      media_library_render(ui.active);
-    }, LV_EVENT_CLICKED, reinterpret_cast<void *>(static_cast<uintptr_t>(static_cast<unsigned char>(*key))));
+      media_library_type_key(static_cast<char>(reinterpret_cast<uintptr_t>(lv_event_get_user_data(event))));
+    }, LV_EVENT_CLICKED, reinterpret_cast<void *>(static_cast<uintptr_t>(static_cast<unsigned char>(key))));
   }
+
+  // The typed letters fill the two spare key spaces before the delete key.
+  lv_obj_t *prefix_box = lv_obj_create(index);
+  lv_obj_remove_style_all(prefix_box);
+  lv_obj_set_size(prefix_box, LV_PCT(36), LV_PCT(15));
+  lv_obj_clear_flag(prefix_box, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_clear_flag(prefix_box, LV_OBJ_FLAG_SCROLLABLE);
+  ui.library_prefix_lbl = lv_label_create(prefix_box);
+  lv_obj_set_width(ui.library_prefix_lbl, LV_PCT(100));
+  lv_obj_set_style_text_align(ui.library_prefix_lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+  lv_obj_set_style_text_color(ui.library_prefix_lbl, lv_color_hex(ctx->accent_color), LV_PART_MAIN);
+  lv_label_set_long_mode(ui.library_prefix_lbl, LV_LABEL_LONG_CLIP);
+  if (ctx->label_font) lv_obj_set_style_text_font(ui.library_prefix_lbl, ctx->label_font, LV_PART_MAIN);
+  lv_label_set_text(ui.library_prefix_lbl, "");
+  lv_obj_center(ui.library_prefix_lbl);
+
+  ui.library_delete_btn = media_library_create_key(ctx, index, 18);
+  media_library_create_key_label(ui.library_delete_btn, ctx->icon_font, find_icon("Backspace"));
+  lv_obj_add_state(ui.library_delete_btn, LV_STATE_DISABLED);
+  lv_obj_add_event_cb(ui.library_delete_btn, [](lv_event_t *) {
+    media_library_delete_key(false);
+  }, LV_EVENT_SHORT_CLICKED, nullptr);
+  lv_obj_add_event_cb(ui.library_delete_btn, [](lv_event_t *) {
+    media_library_delete_key(true);
+  }, LV_EVENT_LONG_PRESSED, nullptr);
+}
+
+inline void media_library_select_filter(espcontrol::media::LibraryFilter filter) {
+  MediaControlModalUi &ui = media_control_modal_ui();
+  MediaControlCtx *ctx = ui.active;
+  if (!ctx || !ui.library_list) return;
+  const auto kind = media_library_kind_for_tab(ui.tab);
+  if (media_library_filter(kind) == filter) return;
+  media_library_filter(kind) = filter;
+  for (size_t i = 0; i < espcontrol::media::LIBRARY_FILTER_COUNT; ++i) {
+    media_library_set_state(ui.library_filter_btns[i], LV_STATE_CHECKED, i == static_cast<size_t>(filter));
+  }
+  ui.library_prefix.clear();
+  ui.library_jump_pending = false;
+  ui.library_keys_enabled = UINT32_MAX;
+  ui.library_starting_index = -1;
+  ui.library_play_failed = false;
+  // A different list: start at the top and relabel every row.
+  for (lv_obj_t *row : ui.library_rows) lv_obj_set_user_data(row, nullptr);
+  lv_obj_scroll_to_y(ui.library_list, 0, LV_ANIM_OFF);
+  media_library_open_list(ctx);
+  media_library_render(ctx);
+}
+
+// All / Favorites / Recent buttons above the list.
+inline lv_obj_t *media_library_create_filter_bar(MediaControlCtx *ctx, lv_obj_t *parent,
+                                                 lv_coord_t height) {
+  MediaControlModalUi &ui = media_control_modal_ui();
+  lv_obj_t *bar = lv_obj_create(parent);
+  lv_obj_set_size(bar, LV_PCT(100), height);
+  lv_obj_set_style_bg_opa(bar, LV_OPA_TRANSP, LV_PART_MAIN);
+  lv_obj_set_style_border_width(bar, 0, LV_PART_MAIN);
+  lv_obj_set_style_pad_all(bar, 0, LV_PART_MAIN);
+  lv_obj_set_style_pad_column(bar, 6, LV_PART_MAIN);
+  lv_obj_set_layout(bar, LV_LAYOUT_FLEX);
+  lv_obj_set_style_flex_flow(bar, LV_FLEX_FLOW_ROW, LV_PART_MAIN);
+  lv_obj_clear_flag(bar, LV_OBJ_FLAG_SCROLLABLE);
+  static const char *const LABELS[espcontrol::media::LIBRARY_FILTER_COUNT] = {
+    "All", "Favorites", "Recent"};
+  const auto selected = media_library_filter(media_library_kind_for_tab(ui.tab));
+  for (size_t i = 0; i < espcontrol::media::LIBRARY_FILTER_COUNT; ++i) {
+    lv_obj_t *btn = media_library_create_key(ctx, bar, 30);
+    lv_obj_set_height(btn, LV_PCT(100));
+    lv_obj_set_flex_grow(btn, 1);
+    media_library_create_key_label(btn, ctx->label_font, espcontrol_i18n(LABELS[i]));
+    if (i == static_cast<size_t>(selected)) lv_obj_add_state(btn, LV_STATE_CHECKED);
+    ui.library_filter_btns[i] = btn;
+    lv_obj_add_event_cb(btn, [](lv_event_t *event) {
+      media_library_select_filter(static_cast<espcontrol::media::LibraryFilter>(
+        reinterpret_cast<uintptr_t>(lv_event_get_user_data(event))));
+    }, LV_EVENT_CLICKED, reinterpret_cast<void *>(static_cast<uintptr_t>(i)));
+  }
+  return bar;
 }
 
 inline void media_control_create_library_tab_content(MediaControlCtx *ctx) {
   MediaControlModalUi &ui = media_control_modal_ui();
   if (!ctx || !ui.content_box || ui.library_list) return;
-  const auto kind = media_library_kind_for_tab(ui.tab);
   const ControlModalLayout layout = control_modal_calc_layout(ctx->width_compensation_percent);
 
   lv_obj_set_layout(ui.content_box, LV_LAYOUT_FLEX);
@@ -402,9 +627,27 @@ inline void media_control_create_library_tab_content(MediaControlCtx *ctx) {
   lv_obj_clear_flag(body, LV_OBJ_FLAG_SCROLLABLE);
   media_library_create_index(ctx, body);
 
-  ui.library_list = lv_obj_create(body);
-  lv_obj_set_height(ui.library_list, LV_PCT(100));
-  lv_obj_set_flex_grow(ui.library_list, 55);
+  lv_coord_t row_h = control_modal_scaled_px(76, layout.short_side);
+  if (row_h < 60) row_h = 60;
+  const lv_coord_t gap = 8;
+
+  // Right column: filter buttons above the list.
+  lv_obj_t *column = lv_obj_create(body);
+  lv_obj_set_height(column, LV_PCT(100));
+  lv_obj_set_flex_grow(column, 55);
+  lv_obj_set_style_bg_opa(column, LV_OPA_TRANSP, LV_PART_MAIN);
+  lv_obj_set_style_border_width(column, 0, LV_PART_MAIN);
+  lv_obj_set_style_pad_all(column, 0, LV_PART_MAIN);
+  lv_obj_set_style_pad_row(column, gap, LV_PART_MAIN);
+  lv_obj_set_layout(column, LV_LAYOUT_FLEX);
+  lv_obj_set_style_flex_flow(column, LV_FLEX_FLOW_COLUMN, LV_PART_MAIN);
+  lv_obj_clear_flag(column, LV_OBJ_FLAG_SCROLLABLE);
+  const lv_coord_t bar_h = row_h * 3 / 4;
+  media_library_create_filter_bar(ctx, column, bar_h);
+
+  ui.library_list = lv_obj_create(column);
+  lv_obj_set_width(ui.library_list, LV_PCT(100));
+  lv_obj_set_flex_grow(ui.library_list, 1);
   lv_obj_set_style_bg_opa(ui.library_list, LV_OPA_TRANSP, LV_PART_MAIN);
   lv_obj_set_style_border_width(ui.library_list, 0, LV_PART_MAIN);
   lv_obj_set_style_pad_all(ui.library_list, 0, LV_PART_MAIN);
@@ -427,9 +670,6 @@ inline void media_control_create_library_tab_content(MediaControlCtx *ctx) {
   lv_obj_set_size(ui.library_spacer, 1, 0);
   lv_obj_set_pos(ui.library_spacer, 0, 0);
 
-  lv_coord_t row_h = control_modal_scaled_px(76, layout.short_side);
-  if (row_h < 60) row_h = 60;
-  const lv_coord_t gap = 8;
   ui.library_row_h = row_h;
   ui.library_row_pitch = row_h + gap;
   // Enough rows to cover the tallest possible list area plus one partly
@@ -440,10 +680,10 @@ inline void media_control_create_library_tab_content(MediaControlCtx *ctx) {
   }
   // The status floats over the top of the list instead of taking a row in
   // the layout, so showing "Loading" during a letter jump moves nothing.
-  ui.library_status_lbl = lv_label_create(body);
+  ui.library_status_lbl = lv_label_create(column);
   lv_obj_add_flag(ui.library_status_lbl, LV_OBJ_FLAG_FLOATING);
-  lv_obj_set_width(ui.library_status_lbl, LV_PCT(55));
-  lv_obj_align(ui.library_status_lbl, LV_ALIGN_TOP_RIGHT, 0, 0);
+  lv_obj_set_width(ui.library_status_lbl, LV_PCT(100));
+  lv_obj_align(ui.library_status_lbl, LV_ALIGN_TOP_MID, 0, bar_h + gap);
   lv_obj_set_style_text_align(ui.library_status_lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
   lv_obj_set_style_text_color(ui.library_status_lbl, lv_color_hex(current_theme().text_muted), LV_PART_MAIN);
   lv_obj_set_style_bg_color(ui.library_status_lbl,
@@ -454,14 +694,6 @@ inline void media_control_create_library_tab_content(MediaControlCtx *ctx) {
   lv_obj_add_flag(ui.library_status_lbl, LV_OBJ_FLAG_HIDDEN);
   ui.library_timer = lv_timer_create(media_library_timer_cb, 500, nullptr);
 
-  espcontrol::media::LibraryList &list = media_library_list(ctx->entity_id, kind);
-  media_library_expire_request(list);
-  const uint32_t now = esphome::millis();
-  const bool stale = list.loaded_ms != 0 &&
-    now - list.loaded_ms >= espcontrol::media::LIBRARY_STALE_MS;
-  if (!list.loading && (list.failed || stale || (list.items.empty() && !list.complete))) {
-    list.complete = false;
-    media_library_request(ctx->entity_id, kind, 0);
-  }
+  media_library_open_list(ctx);
   media_library_render(ctx);
 }

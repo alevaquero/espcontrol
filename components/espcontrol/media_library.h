@@ -27,11 +27,9 @@ enum class LibraryKind : uint8_t {
 
 constexpr size_t LIBRARY_KIND_COUNT = 3;
 constexpr size_t LIBRARY_PAGE_SIZE = 50;
-// Larger pages while catching up to a tapped letter, so a jump near the end
-// of a long library needs fewer round trips.
-constexpr size_t LIBRARY_JUMP_PAGE_SIZE = 200;
-// Request the next page once the visible rows come this close to the end.
-constexpr size_t LIBRARY_PREFETCH_ROWS = 10;
+// After the first page the rest of the library loads in larger pages, so the
+// letter keys know every entry after a few round trips.
+constexpr size_t LIBRARY_BULK_PAGE_SIZE = 200;
 constexpr uint32_t LIBRARY_REQUEST_TIMEOUT_MS = 15000;
 // Libraries are re-read when a tab is opened after this long.
 constexpr uint32_t LIBRARY_STALE_MS = 10UL * 60UL * 1000UL;
@@ -86,9 +84,29 @@ using LibraryString = std::basic_string<char, std::char_traits<char>, LibraryAll
 struct LibraryItem {
   LibraryString name;
   LibraryString uri;
+  // Music Assistant's sort name, which decides the list order.
+  LibraryString sort;
 };
 
 using LibraryItems = std::vector<LibraryItem, LibraryAllocator<LibraryItem>>;
+
+// Which part of a library a tab shows. Recent is ordered by last play, so it
+// has no letter keys and stops after one page.
+enum class LibraryFilter : uint8_t {
+  ALL = 0,
+  FAVORITES = 1,
+  RECENT = 2,
+};
+
+constexpr size_t LIBRARY_FILTER_COUNT = 3;
+
+inline const char *library_order_by(LibraryFilter filter) {
+  return filter == LibraryFilter::RECENT ? "last_played_desc" : "sort_name";
+}
+
+inline bool library_filter_alphabetical(LibraryFilter filter) {
+  return filter != LibraryFilter::RECENT;
+}
 
 // Loaded entries for one library kind of one media player.
 struct LibraryList {
@@ -127,6 +145,64 @@ inline const char *library_response_template() {
          "{% endfor %}";
 }
 
+// Plain letter for an accented Latin-1 letter, given the UTF-8 byte after
+// 0xC3 (U+00C0..U+00FF); 0 when the character has no plain form.
+inline char library_plain_latin1(unsigned char second) {
+  static constexpr std::string_view MAP =
+    "aaaaaa0ceeeeiiii"  // U+00C0
+    "0nooooo00uuuuy00"  // U+00D0
+    "aaaaaa0ceeeeiiii"  // U+00E0
+    "0nooooo00uuuuy0y"; // U+00F0
+  if (second < 0x80 || second > 0xBF) return 0;
+  const char ch = MAP[second - 0x80];
+  return ch == '0' ? 0 : ch;
+}
+
+// Mirrors Music Assistant's create_sort_name: lower case, accents dropped,
+// leading punctuation removed, and a leading article such as "the " moved to
+// the end. The list is ordered by this value, so letter jumps follow it.
+inline LibraryString library_sort_name(std::string_view name) {
+  LibraryString out;
+  out.reserve(name.size() + 6);
+  for (size_t i = 0; i < name.size(); ++i) {
+    const unsigned char ch = static_cast<unsigned char>(name[i]);
+    if (ch == 0xC3 && i + 1 < name.size()) {
+      const unsigned char second = static_cast<unsigned char>(name[i + 1]);
+      const char plain = library_plain_latin1(second);
+      // Capitals without a plain form (such as Æ) still become lower case.
+      const bool capital = second >= 0x80 && second <= 0x9E && second != 0x97;
+      out.push_back(static_cast<char>(ch));
+      if (plain) out.back() = plain;
+      else out.push_back(static_cast<char>(capital ? second + 0x20 : second));
+      ++i;
+      continue;
+    }
+    out.push_back(ch >= 'A' && ch <= 'Z' ? static_cast<char>(ch - 'A' + 'a') : static_cast<char>(ch));
+  }
+  const auto is_space = [](char ch) { return ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n'; };
+  while (!out.empty() && is_space(out.back())) out.pop_back();
+  size_t start = 0;
+  while (start < out.size() && is_space(out[start])) ++start;
+  static constexpr std::string_view LEADING = ",.:!?([{<>)]}/`'\"";
+  while (start < out.size() && LEADING.find(out[start]) != std::string_view::npos) ++start;
+  out.erase(0, start);
+  static constexpr std::string_view ARTICLES[] = {
+    "the ", "de ", "les ", "dj ", "las ", "los ", "le ", "la ", "el ", "a ", "an "};
+  for (std::string_view article : ARTICLES) {
+    if (std::string_view(out).substr(0, article.size()) == article) {
+      out.erase(0, article.size());
+      out += ", ";
+      out.append(article.data(), article.size());
+      break;
+    }
+  }
+  size_t begin = 0;
+  while (begin < out.size() && is_space(out[begin])) ++begin;
+  size_t end = out.size();
+  while (end > begin && is_space(out[end - 1])) --end;
+  return out.substr(begin, end - begin);
+}
+
 // Appends the entries of one rendered page. Lines without a URI are skipped.
 // Returns how many lines the page contained, including skipped ones, so the
 // caller can tell whether Music Assistant returned a full page.
@@ -150,7 +226,9 @@ inline size_t library_parse_page(const char *payload, LibraryItems &out,
         name = first == LibraryString::npos ? LibraryString() : name.substr(first);
         while (!name.empty() && name.back() == ' ') name.pop_back();
         if (!uri.empty() && out.size() < max_items) {
-          out.push_back({name.empty() ? uri : name, uri});
+          LibraryString shown = name.empty() ? uri : name;
+          LibraryString sort = library_sort_name(shown);
+          out.push_back({std::move(shown), std::move(uri), std::move(sort)});
         }
       }
     }
@@ -166,10 +244,8 @@ inline bool library_page_complete(size_t page_lines, size_t page_size, size_t lo
   return page_lines < page_size || loaded >= max_items;
 }
 
-inline bool library_should_fetch_more(const LibraryList &list, size_t last_visible_index,
-                                      size_t max_items) {
-  if (list.loading || list.complete || list.failed || list.items.size() >= max_items) return false;
-  return last_visible_index + LIBRARY_PREFETCH_ROWS >= list.items.size();
+inline bool library_should_load_more(const LibraryList &list, size_t max_items) {
+  return !list.loading && !list.complete && !list.failed && list.items.size() < max_items;
 }
 
 // First item index shown at a scroll offset for fixed-pitch rows.
@@ -179,41 +255,64 @@ inline size_t library_first_visible(int scroll_y, int row_pitch, size_t count) {
   return first >= count ? count - 1 : first;
 }
 
-// Letter index for jumping through a library. Keys are '#' (anything that
-// does not start with a letter) and 'A'..'Z'. A leading "The " is skipped,
-// matching how Music Assistant sorts names.
+// Letter keys for jumping through a library. Keys are '#' (anything that is
+// not a letter) and 'A'..'Z'. Tapping several keys in a row builds a prefix
+// such as "AN", matched against the start of each entry's sort name.
 constexpr const char *LIBRARY_INDEX_KEYS = "#ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+constexpr size_t LIBRARY_INDEX_KEY_COUNT = 27;
+constexpr size_t LIBRARY_PREFIX_MAX = 12;
+// Typed letters are forgotten this long after the last key tap.
+constexpr uint32_t LIBRARY_PREFIX_TIMEOUT_MS = 3000;
 
-inline char library_index_key(std::string_view name) {
-  size_t start = name.find_first_not_of(' ');
-  if (start == std::string_view::npos) return '#';
-  if (name.size() > start + 4) {
-    const char t = name[start], h = name[start + 1], e = name[start + 2];
-    if ((t == 'T' || t == 't') && (h == 'H' || h == 'h') && (e == 'E' || e == 'e') &&
-        name[start + 3] == ' ') {
-      const size_t next = name.find_first_not_of(' ', start + 4);
-      if (next != std::string_view::npos) start = next;
-    }
+// Position in key order: '#' and other non-letters first, then A..Z.
+inline int library_key_rank(char ch) {
+  if (ch >= 'a' && ch <= 'z') return ch - 'a' + 1;
+  if (ch >= 'A' && ch <= 'Z') return ch - 'A' + 1;
+  return 0;
+}
+
+inline char library_key_for_rank(int rank) {
+  return rank <= 0 ? '#' : static_cast<char>('A' + rank - 1);
+}
+
+// Compares the start of a sort name with a typed prefix in key order:
+// negative if the entry comes before every match, 0 if it matches, positive
+// if it comes after.
+inline int library_prefix_compare(std::string_view sort, std::string_view prefix) {
+  for (size_t i = 0; i < prefix.size(); ++i) {
+    if (i >= sort.size()) return -1;
+    const int diff = library_key_rank(sort[i]) - library_key_rank(prefix[i]);
+    if (diff != 0) return diff;
   }
-  const char ch = name[start];
-  if (ch >= 'a' && ch <= 'z') return static_cast<char>(ch - 'a' + 'A');
-  if (ch >= 'A' && ch <= 'Z') return ch;
-  return '#';
+  return 0;
 }
 
-// Position of a key in index order: '#' first, then A..Z.
-inline int library_index_rank(char key) {
-  return key >= 'A' && key <= 'Z' ? key - 'A' + 1 : 0;
-}
-
-// First loaded entry at or after the key, or -1 if every loaded entry comes
-// before it (more pages may still need loading).
-inline int library_index_find(const LibraryItems &items, char key) {
-  const int target = library_index_rank(key);
+// First loaded entry at or after the prefix, or -1 if every loaded entry
+// comes before it (more pages may still need loading).
+inline int library_prefix_find(const LibraryItems &items, std::string_view prefix) {
   for (size_t i = 0; i < items.size(); ++i) {
-    if (library_index_rank(library_index_key(items[i].name)) >= target) return static_cast<int>(i);
+    if (library_prefix_compare(items[i].sort, prefix) >= 0) return static_cast<int>(i);
   }
   return -1;
+}
+
+// Keys that can follow the prefix, as bits in LIBRARY_INDEX_KEYS order. While
+// the list is still loading, keys whose entries may be in later pages stay
+// available.
+inline uint32_t library_next_keys(const LibraryItems &items, std::string_view prefix, bool complete) {
+  uint32_t keys = 0;
+  for (const LibraryItem &item : items) {
+    if (item.sort.size() <= prefix.size() || library_prefix_compare(item.sort, prefix) != 0) continue;
+    keys |= 1u << library_key_rank(item.sort[prefix.size()]);
+  }
+  if (complete) return keys;
+  std::string candidate(prefix);
+  candidate.push_back('#');
+  for (size_t rank = 0; rank < LIBRARY_INDEX_KEY_COUNT; ++rank) {
+    candidate.back() = library_key_for_rank(static_cast<int>(rank));
+    if (items.empty() || library_prefix_compare(items.back().sort, candidate) <= 0) keys |= 1u << rank;
+  }
+  return keys;
 }
 
 }  // namespace espcontrol::media

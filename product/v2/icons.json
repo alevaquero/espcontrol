@@ -265,6 +265,11 @@
       "mdi": "awning-outline"
     },
     {
+      "name": "Backspace",
+      "codepoint": "F006E",
+      "mdi": "backspace"
+    },
+    {
       "name": "Battery",
       "codepoint": "F0079",
       "mdi": "battery"

@@ -153,8 +153,21 @@ struct MediaControlModalUi {
   lv_obj_t *library_list = nullptr;
   lv_obj_t *library_spacer = nullptr;
   lv_obj_t *library_index = nullptr;
+  lv_obj_t *library_keys[espcontrol::media::LIBRARY_INDEX_KEY_COUNT] = {};
+  lv_obj_t *library_prefix_lbl = nullptr;
+  lv_obj_t *library_delete_btn = nullptr;
+  lv_obj_t *library_filter_btns[espcontrol::media::LIBRARY_FILTER_COUNT] = {};
+  // Letters typed on the keys, and the prefix a jump is still loading for.
+  std::string library_prefix;
+  std::string library_jump_target;
+  bool library_jump_pending = false;
+  uint32_t library_prefix_ms = 0;
+  // Key state last applied, so the keys are only restyled when it changes.
+  uint32_t library_keys_enabled = UINT32_MAX;
+  uint32_t library_keys_lit = UINT32_MAX;
+  size_t library_keys_count = SIZE_MAX;
+  bool library_keys_complete = false;
   // Letter tapped in the index while its entries are still loading.
-  char library_pending_key = 0;
   std::vector<lv_obj_t *> library_rows;
   lv_timer_t *library_timer = nullptr;
   lv_coord_t library_row_h = 0;
@@ -4424,7 +4437,18 @@ inline void media_control_clear_tab_content() {
   ui.library_list = nullptr;
   ui.library_spacer = nullptr;
   ui.library_index = nullptr;
-  ui.library_pending_key = 0;
+  for (lv_obj_t *&key : ui.library_keys) key = nullptr;
+  ui.library_prefix_lbl = nullptr;
+  ui.library_delete_btn = nullptr;
+  for (lv_obj_t *&btn : ui.library_filter_btns) btn = nullptr;
+  ui.library_prefix.clear();
+  ui.library_jump_target.clear();
+  ui.library_jump_pending = false;
+  ui.library_prefix_ms = 0;
+  ui.library_keys_enabled = UINT32_MAX;
+  ui.library_keys_lit = UINT32_MAX;
+  ui.library_keys_count = SIZE_MAX;
+  ui.library_keys_complete = false;
   ui.library_row_h = 0;
   ui.library_row_pitch = 0;
   ui.library_last_scroll_ms = 0;

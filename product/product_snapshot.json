@@ -12,7 +12,7 @@
     "deviceProfiles": 10,
     "cardTypes": 44,
     "entityNames": 112,
-    "icons": 370,
+    "icons": 371,
     "structuralIcons": 28,
     "compatibilityFixtureGroups": 2
   },
@@ -8523,6 +8523,11 @@
         "name": "Awning Outline",
         "codepoint": "F1B88",
         "mdi": "awning-outline"
+      },
+      {
+        "name": "Backspace",
+        "codepoint": "F006E",
+        "mdi": "backspace"
       },
       {
         "name": "Battery",
