@@ -99,14 +99,30 @@ inline void media_library_handle_response(const std::string &entity_id,
   } else {
     auto json = response.get_json();
     const char *payload = json["response"].as<const char *>();
-    if (offset == 0) list.items.clear();
+    if (offset == 0) {
+      list.items.clear();
+      list.fetched = 0;
+      list.last_fetched.clear();
+    }
     // A page for an older position (the list was reset meanwhile) is dropped.
-    if (offset == list.items.size()) {
+    if (offset == list.fetched) {
       const size_t max_items = media_library_max_items(filter);
+      const size_t before = list.items.size();
       const size_t lines = espcontrol::media::library_parse_page(
         payload ? payload : "", list.items, max_items);
+      list.fetched += lines;
+      if (list.items.size() > before) {
+        list.last_fetched = espcontrol::media::library_page_progress(list.items, before);
+      }
       list.complete = espcontrol::media::library_page_complete(
         lines, limit, list.items.size(), max_items);
+      if (espcontrol::media::library_filter_alphabetical(filter) && list.items.size() > before) {
+        espcontrol::media::library_sort(list.items);
+        // Entries may have moved under the rows, so relabel them all.
+        if (media_library_tab_shows(entity_id, kind, filter)) {
+          for (lv_obj_t *row : media_control_modal_ui().library_rows) lv_obj_set_user_data(row, nullptr);
+        }
+      }
       list.failed = false;
       list.loaded_ms = esphome::millis();
       ESP_LOGI("media_library", "Loaded %u %s entries for %s (total %u%s)",
@@ -208,7 +224,8 @@ inline void media_library_update_keys(espcontrol::media::LibraryFilter filter,
     uint32_t enabled = 0;
     if (espcontrol::media::library_filter_alphabetical(filter) &&
         ui.library_prefix.size() < espcontrol::media::LIBRARY_PREFIX_MAX) {
-      enabled = espcontrol::media::library_next_keys(list.items, ui.library_prefix, list.complete);
+      enabled = espcontrol::media::library_next_keys(list.items, ui.library_prefix, list.complete,
+                                                     list.last_fetched);
     }
     // Keep the value distinct from the "recompute" marker.
     ui.library_keys_enabled = enabled & ((1u << espcontrol::media::LIBRARY_INDEX_KEY_COUNT) - 1);
@@ -245,7 +262,10 @@ inline void media_library_render(MediaControlCtx *ctx) {
   if (lv_obj_get_height(ui.library_spacer) != total_h) lv_obj_set_height(ui.library_spacer, total_h);
   if (ui.library_jump_pending) {
     const int index = espcontrol::media::library_prefix_find(list.items, ui.library_jump_target);
-    if (index >= 0 || list.complete || list.failed || count >= max_items) {
+    // Wait until loading has passed the prefix, so the jump lands on the
+    // first match rather than one that happened to load early.
+    const bool loaded = espcontrol::media::library_loaded_past(list, ui.library_jump_target);
+    if ((index >= 0 && loaded) || list.complete || list.failed || count >= max_items) {
       // Found, or nothing later exists: show the match, else the last entry.
       ui.library_jump_pending = false;
       const size_t target = index >= 0 ? static_cast<size_t>(index) : (count ? count - 1 : 0);
@@ -299,9 +319,9 @@ inline void media_library_render(MediaControlCtx *ctx) {
   // first page is small so the list appears quickly.
   if (espcontrol::media::library_should_load_more(list, max_items)) {
     const size_t room = max_items - count;
-    const size_t page = count == 0 ? espcontrol::media::LIBRARY_PAGE_SIZE
-                                   : espcontrol::media::LIBRARY_BULK_PAGE_SIZE;
-    media_library_request(ctx->entity_id, kind, filter, count, room < page ? room : page);
+    const size_t page = list.fetched == 0 ? espcontrol::media::LIBRARY_PAGE_SIZE
+                                          : espcontrol::media::LIBRARY_BULK_PAGE_SIZE;
+    media_library_request(ctx->entity_id, kind, filter, list.fetched, room < page ? room : page);
   }
 }
 

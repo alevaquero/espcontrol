@@ -6,6 +6,7 @@
 // into compact "name<TAB>uri" lines, so the firmware never parses the large
 // JSON library payload itself.
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -84,7 +85,7 @@ using LibraryString = std::basic_string<char, std::char_traits<char>, LibraryAll
 struct LibraryItem {
   LibraryString name;
   LibraryString uri;
-  // Music Assistant's sort name, which decides the list order.
+  // Sort name built from the shown name; alphabetical lists are ordered by it.
   LibraryString sort;
 };
 
@@ -111,6 +112,11 @@ inline bool library_filter_alphabetical(LibraryFilter filter) {
 // Loaded entries for one library kind of one media player.
 struct LibraryList {
   LibraryItems items;
+  // Entries received so far, in Music Assistant's order: the next page's
+  // offset, and the sort name of the last one, which tells how far into the
+  // alphabet loading has got.
+  size_t fetched = 0;
+  LibraryString last_fetched;
   bool loading = false;
   bool complete = false;
   bool failed = false;
@@ -160,7 +166,9 @@ inline char library_plain_latin1(unsigned char second) {
 
 // Mirrors Music Assistant's create_sort_name: lower case, accents dropped,
 // leading punctuation removed, and a leading article such as "the " moved to
-// the end. The list is ordered by this value, so letter jumps follow it.
+// the end. Music Assistant may sort an artist by a different name (Tori Amos
+// as "Amos, Tori"), so the panel orders alphabetical lists by this value
+// itself; letter keys then always match the names on screen.
 inline LibraryString library_sort_name(std::string_view name) {
   LibraryString out;
   out.reserve(name.size() + 6);
@@ -297,9 +305,10 @@ inline int library_prefix_find(const LibraryItems &items, std::string_view prefi
 }
 
 // Keys that can follow the prefix, as bits in LIBRARY_INDEX_KEYS order. While
-// the list is still loading, keys whose entries may be in later pages stay
-// available.
-inline uint32_t library_next_keys(const LibraryItems &items, std::string_view prefix, bool complete) {
+// the list is still loading, keys at or after the last received entry stay
+// available because their entries may be in later pages.
+inline uint32_t library_next_keys(const LibraryItems &items, std::string_view prefix, bool complete,
+                                  std::string_view last_fetched) {
   uint32_t keys = 0;
   for (const LibraryItem &item : items) {
     if (item.sort.size() <= prefix.size() || library_prefix_compare(item.sort, prefix) != 0) continue;
@@ -310,9 +319,48 @@ inline uint32_t library_next_keys(const LibraryItems &items, std::string_view pr
   candidate.push_back('#');
   for (size_t rank = 0; rank < LIBRARY_INDEX_KEY_COUNT; ++rank) {
     candidate.back() = library_key_for_rank(static_cast<int>(rank));
-    if (items.empty() || library_prefix_compare(items.back().sort, candidate) <= 0) keys |= 1u << rank;
+    if (items.empty() || library_prefix_compare(last_fetched, candidate) <= 0) keys |= 1u << rank;
   }
   return keys;
+}
+
+// Order used for alphabetical lists, consistent with the letter keys:
+// characters compare by key first ('#' group, then A..Z), then by byte.
+inline bool library_sort_less(const LibraryItem &a, const LibraryItem &b) {
+  const size_t n = std::min(a.sort.size(), b.sort.size());
+  for (size_t i = 0; i < n; ++i) {
+    const int diff = library_key_rank(a.sort[i]) - library_key_rank(b.sort[i]);
+    if (diff != 0) return diff < 0;
+    const unsigned char ca = static_cast<unsigned char>(a.sort[i]);
+    const unsigned char cb = static_cast<unsigned char>(b.sort[i]);
+    if (ca != cb) return ca < cb;
+  }
+  if (a.sort.size() != b.sort.size()) return a.sort.size() < b.sort.size();
+  return a.uri < b.uri;
+}
+
+inline void library_sort(LibraryItems &items) {
+  std::sort(items.begin(), items.end(), library_sort_less);
+}
+
+// How far into the alphabet a page reached: the lowest sort name among its
+// last few entries, so one entry Music Assistant filed elsewhere (Tori Amos
+// among the A's) does not make loading look further along than it is.
+inline LibraryString library_page_progress(const LibraryItems &items, size_t page_start) {
+  constexpr size_t SAMPLE = 5;
+  const size_t from = items.size() - page_start > SAMPLE ? items.size() - SAMPLE : page_start;
+  size_t lowest = items.size() - 1;
+  for (size_t i = from; i < items.size(); ++i) {
+    if (library_sort_less(items[i], items[lowest])) lowest = i;
+  }
+  return items[lowest].sort;
+}
+
+// True once loading has gone past every entry that can start with the
+// prefix. Entries Music Assistant files elsewhere can still turn up later,
+// but they are rare, so a jump does not wait for the whole library.
+inline bool library_loaded_past(const LibraryList &list, std::string_view prefix) {
+  return list.complete || (list.fetched > 0 && library_prefix_compare(list.last_fetched, prefix) > 0);
 }
 
 }  // namespace espcontrol::media

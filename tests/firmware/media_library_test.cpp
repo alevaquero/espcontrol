@@ -115,14 +115,44 @@ int main() {
 
   const auto bit = [](char key) { return 1u << library_key_rank(key); };
   // With the whole library loaded, only letters that lead somewhere stay on.
-  assert(library_next_keys(artists, "", true) ==
+  assert(library_next_keys(artists, "", true, "") ==
          (bit('#') | bit('A') | bit('B') | bit('C') | bit('H')));
-  assert(library_next_keys(artists, "A", true) == (bit('B') | bit('C') | bit('D') | bit('N') | bit('R')));
-  assert(library_next_keys(artists, "AC", true) == bit('#'));
-  assert(library_next_keys(artists, "AN", true) == (bit('A') | bit('D')));
-  assert(library_next_keys(artists, "ZZ", true) == 0);
+  assert(library_next_keys(artists, "A", true, "") == (bit('B') | bit('C') | bit('D') | bit('N') | bit('R')));
+  assert(library_next_keys(artists, "AC", true, "") == bit('#'));
+  assert(library_next_keys(artists, "AN", true, "") == (bit('A') | bit('D')));
+  assert(library_next_keys(artists, "ZZ", true, "") == 0);
   // While loading, letters after the last loaded entry may still exist.
-  const uint32_t loading = library_next_keys(artists, "", false);
+  const uint32_t loading = library_next_keys(artists, "", false, artists.back().sort);
   assert((loading & bit('H')) && (loading & bit('Z')) && !(loading & bit('D')));
-  assert(library_next_keys(LibraryItems{}, "", false) == (1u << LIBRARY_INDEX_KEY_COUNT) - 1);
+  assert(library_next_keys(LibraryItems{}, "", false, "") == (1u << LIBRARY_INDEX_KEY_COUNT) - 1);
+
+  // Music Assistant files Tori Amos as "Amos, Tori", among the A's. Sorting by
+  // the shown name moves her to the T's, so M and S jump to M and S names.
+  LibraryItems filed = make_items({"ABBA", "Tori Amos", "Arcade Fire", "The Beatles", "Madonna",
+                                   "Muse", "Sade", "Sting", "Talking Heads"});
+  assert(library_prefix_find(filed, "M") == 1);  // before sorting: the bug
+  library_sort(filed);
+  assert(filed[library_prefix_find(filed, "M")].name == "Madonna");
+  assert(filed[library_prefix_find(filed, "S")].name == "Sade");
+  assert(filed[library_prefix_find(filed, "T")].name == "Talking Heads");
+  assert(filed[library_prefix_find(filed, "TO")].name == "Tori Amos");
+  assert(filed[library_prefix_find(filed, "B")].name == "The Beatles");
+  // '#' entries sort first, then letters; ties keep a fixed order.
+  LibraryItems mixed = make_items({"Zero", "2Pac", "alpha", "Alpha"});
+  library_sort(mixed);
+  assert(mixed[0].name == "2Pac" && mixed[3].name == "Zero");
+
+  // Progress ignores one late-alphabet entry at the end of a page.
+  const LibraryItems page = make_items({"Aaron", "Abba", "Ace", "Adele", "Tori Amos"});
+  assert(library_page_progress(page, 0) == "aaron");
+  const LibraryItems small = make_items({"Beck"});
+  assert(library_page_progress(small, 0) == "beck");
+  LibraryList progress;
+  progress.fetched = 5;
+  progress.last_fetched = "adele";
+  assert(library_loaded_past(progress, "AC"));
+  assert(!library_loaded_past(progress, "AD"));
+  assert(!library_loaded_past(progress, "M"));
+  progress.complete = true;
+  assert(library_loaded_past(progress, "M"));
 }
