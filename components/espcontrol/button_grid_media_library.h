@@ -18,7 +18,7 @@
 #ifdef ESPCONTROL_LOW_HEAP_MEDIA_CONTROL
 #define ESPCONTROL_MEDIA_LIBRARY_MAX_ITEMS 200
 #else
-#define ESPCONTROL_MEDIA_LIBRARY_MAX_ITEMS 1000
+#define ESPCONTROL_MEDIA_LIBRARY_MAX_ITEMS 3000
 #endif
 constexpr size_t MEDIA_LIBRARY_MAX_ITEMS = ESPCONTROL_MEDIA_LIBRARY_MAX_ITEMS;
 
@@ -334,7 +334,7 @@ inline lv_obj_t *media_library_create_row(MediaControlCtx *ctx, lv_obj_t *parent
   return row;
 }
 
-// Letter keys beside the Artists list. Tapping one scrolls to the first
+// Letter keys beside the library list. Tapping one scrolls to the first
 // entry at or after that letter, loading further pages first if needed.
 inline void media_library_create_index(MediaControlCtx *ctx, lv_obj_t *parent) {
   MediaControlModalUi &ui = media_control_modal_ui();
@@ -397,8 +397,7 @@ inline void media_control_create_library_tab_content(MediaControlCtx *ctx) {
   lv_obj_set_layout(body, LV_LAYOUT_FLEX);
   lv_obj_set_style_flex_flow(body, LV_FLEX_FLOW_ROW, LV_PART_MAIN);
   lv_obj_clear_flag(body, LV_OBJ_FLAG_SCROLLABLE);
-  const bool has_index = kind == espcontrol::media::LibraryKind::ARTIST;
-  if (has_index) media_library_create_index(ctx, body);
+  media_library_create_index(ctx, body);
 
   ui.library_list = lv_obj_create(body);
   lv_obj_set_height(ui.library_list, LV_PCT(100));
@@ -440,7 +439,7 @@ inline void media_control_create_library_tab_content(MediaControlCtx *ctx) {
   // the layout, so showing "Loading" during a letter jump moves nothing.
   ui.library_status_lbl = lv_label_create(body);
   lv_obj_add_flag(ui.library_status_lbl, LV_OBJ_FLAG_FLOATING);
-  lv_obj_set_width(ui.library_status_lbl, has_index ? LV_PCT(55) : LV_PCT(100));
+  lv_obj_set_width(ui.library_status_lbl, LV_PCT(55));
   lv_obj_align(ui.library_status_lbl, LV_ALIGN_TOP_RIGHT, 0, 0);
   lv_obj_set_style_text_align(ui.library_status_lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
   lv_obj_set_style_text_color(ui.library_status_lbl, lv_color_hex(current_theme().text_muted), LV_PART_MAIN);

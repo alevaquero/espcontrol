@@ -55,9 +55,9 @@ If the main player becomes unavailable, you can still open the popup to use the 
 
 If the card's player comes from [Music Assistant](https://www.home-assistant.io/integrations/music_assistant/), switch on the **Playlists**, **Artists**, or **Radios** tabs in **Modal Settings** to browse your Music Assistant library from the popup. They are off by default.
 
-- Each tab lists that part of your library. More entries load as you scroll, up to 1,000 per tab (200 on ESP32-S3 panels).
+- Each tab lists that part of your library. More entries load as you scroll, up to 3,000 per tab (200 on ESP32-S3 panels).
 - Tap an entry to play it on the card's player. The popup then returns to the Controls tab.
-- The Artists tab has letter keys beside the list. Tap a letter to jump to the first artist starting with it, then scroll up or down from there. Names starting with "The" are filed under the next word, and **#** covers names that start with a number or symbol.
+- Each tab has letter keys beside the list. Tap a letter to jump to the first entry starting with it, then scroll up or down from there. Names starting with "The" are filed under the next word, and **#** covers names that start with a number or symbol.
 - The list is kept while the panel is running and is refreshed when you open the tab again after 10 minutes.
 
 The panel finds your Music Assistant setup from the card's player, so there is nothing else to enter. The card's entity must be a Music Assistant player, such as the `media_player` entities the Music Assistant integration creates. If the tab shows **Could not load**, check that the entity belongs to Music Assistant and that the panel is allowed to perform Home Assistant actions.
