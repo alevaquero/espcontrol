@@ -329,6 +329,13 @@ display:
       inverted: true
     update_interval: never
     auto_clear_enabled: false
+    # This portrait panel is always rotated. LVGL's PPA rotation waits forever
+    # for each job, and a lost job froze the panel until the task watchdog
+    # rebooted it. Rotate in the display driver instead, which gives the PPA a
+    # time limit and falls back to the CPU, and copy frames with the CPU so the
+    # PPA is the only DMA2D user while drawing.
+    rotate_in_driver: true
+    dma2d_frame_copy: false
     dimensions:
       width: 720
       height: 1280

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run production display writes with failed submissions and real wait ordering."""
+"""Run production display writes with failed submissions, lost completions, and real wait ordering."""
 from pathlib import Path
 import os
 import re
@@ -10,15 +10,19 @@ import tempfile
 root = Path(__file__).resolve().parents[2]
 production = (root / "components/mipi_dsi/mipi_dsi.cpp").read_text()
 write = re.search(r"^void MipiDsi::write_to_display_\(.*?^\}", production, re.M | re.S)[0]
+timeout = re.search(r"^static constexpr uint32_t TRANSFER_TIMEOUT_MS = .*?;$", production, re.M)[0]
+wait = re.search(r"^bool MipiDsi::wait_for_transfer_\(.*?^\}", production, re.M | re.S)[0]
 source = r'''
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
 using esp_err_t = int;
-constexpr int ESP_OK = 0, portMAX_DELAY = -1;
-static int waits = 0, draws = 0, failure_at = 0;
+constexpr int ESP_OK = 0, pdTRUE = 1;
+#define pdMS_TO_TICKS(ms) (ms)
+static int waits = 0, draws = 0, failure_at = 0, lost_at = 0;
 static bool pending = false;
 #define ESP_LOGE(...) ((void)0)
+#define ESP_LOGW(...) ((void)0)
 int esp_lcd_panel_draw_bitmap(int, int, int, int, int, const uint8_t *) {
   assert(!pending);  // Never reuse the source before the previous copy finishes.
   ++draws;
@@ -26,18 +30,20 @@ int esp_lcd_panel_draw_bitmap(int, int, int, int, int, const uint8_t *) {
   pending = true;
   return ESP_OK;
 }
-int xSemaphoreTake(int, int timeout) {
-  assert(timeout == portMAX_DELAY);
+int xSemaphoreTake(int, uint32_t timeout) {
+  assert(timeout > 0 && timeout < 5000);  // Bounded, well under the task watchdog.
   assert(pending);  // A failed submission will never signal completion.
   pending = false;
   ++waits;
-  return 1;
+  return waits == lost_at ? 0 : 1;  // A lost completion interrupt times out.
 }
 struct MipiDsi {
   int handle_ = 0, color_depth_ = 1, io_lock_ = 0;
+  uint32_t transfer_timeouts_ = 0;
+  bool wait_for_transfer_();
   void write_to_display_(int, int, int, int, const uint8_t *, int, int, int);
 };
-''' + write + r'''
+''' + timeout + "\n" + wait + "\n" + write + r'''
 int main() {
   MipiDsi display;
   uint8_t data[64]{};
@@ -54,7 +60,16 @@ int main() {
   draws = waits = 0;
   display.write_to_display_(0, 0, 2, 3, data, 0, 0, 1);
   assert(draws == 3 && waits == 3 && !pending);
-  std::puts("Display submission failures skip waits; successful copies finish before buffer reuse");
+  // A completion that never arrives returns instead of hanging, and a
+  // line-by-line draw stops rather than queueing more copies behind it.
+  draws = waits = 0;
+  lost_at = 1;
+  display.write_to_display_(0, 0, 2, 2, data, 0, 0, 0);
+  assert(draws == 1 && waits == 1 && display.transfer_timeouts_ == 1);
+  draws = waits = 0;
+  display.write_to_display_(0, 0, 2, 3, data, 0, 0, 1);
+  assert(draws == 1 && waits == 1 && display.transfer_timeouts_ == 2);
+  std::puts("Display submission failures skip waits; lost completions time out; copies finish before buffer reuse");
 }
 '''
 with tempfile.TemporaryDirectory(prefix="mipi-dsi-draw-") as directory:
