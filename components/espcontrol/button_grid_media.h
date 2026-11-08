@@ -161,7 +161,6 @@ struct MediaControlModalUi {
   std::string library_prefix;
   std::string library_jump_target;
   bool library_jump_pending = false;
-  uint32_t library_prefix_ms = 0;
   // Key state last applied, so the keys are only restyled when it changes.
   uint32_t library_keys_enabled = UINT32_MAX;
   uint32_t library_keys_lit = UINT32_MAX;
@@ -4444,7 +4443,6 @@ inline void media_control_clear_tab_content() {
   ui.library_prefix.clear();
   ui.library_jump_target.clear();
   ui.library_jump_pending = false;
-  ui.library_prefix_ms = 0;
   ui.library_keys_enabled = UINT32_MAX;
   ui.library_keys_lit = UINT32_MAX;
   ui.library_keys_count = SIZE_MAX;

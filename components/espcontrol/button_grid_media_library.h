@@ -404,13 +404,6 @@ inline void media_library_timer_cb(lv_timer_t *) {
       esphome::millis() - ui.library_play_ms >= espcontrol::media::LIBRARY_REQUEST_TIMEOUT_MS) {
     ha_cancel_action_response_callback(ui.library_play_call_id, "timeout");
   }
-  // Typed letters are forgotten after a pause; the list stays where it is.
-  if (!ui.library_prefix.empty() &&
-      esphome::millis() - ui.library_prefix_ms >= espcontrol::media::LIBRARY_PREFIX_TIMEOUT_MS) {
-    ui.library_prefix.clear();
-    ui.library_keys_enabled = UINT32_MAX;
-    media_library_render(ctx);
-  }
 }
 
 inline lv_obj_t *media_library_create_row(MediaControlCtx *ctx, lv_obj_t *parent,
@@ -493,7 +486,6 @@ inline void media_library_type_key(char key) {
   if (!ui.active || !ui.library_list ||
       ui.library_prefix.size() >= espcontrol::media::LIBRARY_PREFIX_MAX) return;
   ui.library_prefix.push_back(key);
-  ui.library_prefix_ms = esphome::millis();
   ui.library_jump_target = ui.library_prefix;
   ui.library_jump_pending = true;
   ui.library_keys_enabled = UINT32_MAX;
@@ -507,7 +499,6 @@ inline void media_library_delete_key(bool all) {
   if (!ui.active || !ui.library_list || ui.library_prefix.empty()) return;
   if (all) ui.library_prefix.clear();
   else ui.library_prefix.pop_back();
-  ui.library_prefix_ms = esphome::millis();
   ui.library_keys_enabled = UINT32_MAX;
   if (!ui.library_prefix.empty()) {
     ui.library_jump_target = ui.library_prefix;

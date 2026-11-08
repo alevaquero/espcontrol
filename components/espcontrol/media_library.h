@@ -269,8 +269,6 @@ inline size_t library_first_visible(int scroll_y, int row_pitch, size_t count) {
 constexpr const char *LIBRARY_INDEX_KEYS = "#ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 constexpr size_t LIBRARY_INDEX_KEY_COUNT = 27;
 constexpr size_t LIBRARY_PREFIX_MAX = 12;
-// Typed letters are forgotten this long after the last key tap.
-constexpr uint32_t LIBRARY_PREFIX_TIMEOUT_MS = 3000;
 
 // Position in key order: '#' and other non-letters first, then A..Z.
 inline int library_key_rank(char ch) {
