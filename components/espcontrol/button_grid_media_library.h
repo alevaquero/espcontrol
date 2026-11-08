@@ -141,9 +141,6 @@ inline void media_library_style_row(MediaControlCtx *ctx, lv_obj_t *row, bool st
   const uint32_t text = starting ? readable_text_color_for_bg(bg) : current_theme().text_primary;
   theme_set_content_background(row, starting);
   lv_obj_set_style_bg_color(row, lv_color_hex(bg), LV_PART_MAIN);
-  // Rows are plain text; only the entry being started is filled. Fewer
-  // filled shapes keep each scrolled frame cheap to draw.
-  lv_obj_set_style_bg_opa(row, starting ? LV_OPA_COVER : LV_OPA_TRANSP, LV_PART_MAIN);
   for (uint32_t i = 0; i < lv_obj_get_child_cnt(row); ++i) {
     lv_obj_set_style_text_color(lv_obj_get_child(row, i), lv_color_hex(text), LV_PART_MAIN);
   }
@@ -306,7 +303,7 @@ inline lv_obj_t *media_library_create_row(MediaControlCtx *ctx, lv_obj_t *parent
   lv_obj_set_style_radius(row, control_modal_card_radius(ctx->btn), LV_PART_MAIN);
   lv_obj_set_style_border_width(row, 0, LV_PART_MAIN);
   lv_obj_set_style_shadow_width(row, 0, LV_PART_MAIN);
-  lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, LV_PART_MAIN);
+  lv_obj_set_style_bg_opa(row, LV_OPA_COVER, LV_PART_MAIN);
   const lv_coord_t pad_x = control_modal_scaled_px(18, short_side);
   lv_obj_set_style_pad_left(row, pad_x, LV_PART_MAIN);
   lv_obj_set_style_pad_right(row, pad_x, LV_PART_MAIN);
@@ -389,13 +386,6 @@ inline void media_control_create_library_tab_content(MediaControlCtx *ctx) {
 
   lv_obj_set_layout(ui.content_box, LV_LAYOUT_FLEX);
   lv_obj_set_flex_flow(ui.content_box, LV_FLEX_FLOW_COLUMN);
-  lv_obj_set_style_pad_row(ui.content_box, 8, LV_PART_MAIN);
-  ui.library_status_lbl = lv_label_create(ui.content_box);
-  lv_obj_set_width(ui.library_status_lbl, LV_PCT(100));
-  lv_obj_set_style_text_align(ui.library_status_lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-  lv_obj_set_style_text_color(ui.library_status_lbl, lv_color_hex(current_theme().text_muted), LV_PART_MAIN);
-  if (ctx->label_font) lv_obj_set_style_text_font(ui.library_status_lbl, ctx->label_font, LV_PART_MAIN);
-  lv_obj_add_flag(ui.library_status_lbl, LV_OBJ_FLAG_HIDDEN);
 
   lv_obj_t *body = lv_obj_create(ui.content_box);
   lv_obj_set_width(body, LV_PCT(100));
@@ -407,7 +397,8 @@ inline void media_control_create_library_tab_content(MediaControlCtx *ctx) {
   lv_obj_set_layout(body, LV_LAYOUT_FLEX);
   lv_obj_set_style_flex_flow(body, LV_FLEX_FLOW_ROW, LV_PART_MAIN);
   lv_obj_clear_flag(body, LV_OBJ_FLAG_SCROLLABLE);
-  if (kind == espcontrol::media::LibraryKind::ARTIST) media_library_create_index(ctx, body);
+  const bool has_index = kind == espcontrol::media::LibraryKind::ARTIST;
+  if (has_index) media_library_create_index(ctx, body);
 
   ui.library_list = lv_obj_create(body);
   lv_obj_set_height(ui.library_list, LV_PCT(100));
@@ -445,6 +436,20 @@ inline void media_control_create_library_tab_content(MediaControlCtx *ctx) {
   for (size_t i = 0; i < pool; ++i) {
     ui.library_rows.push_back(media_library_create_row(ctx, ui.library_list, row_h, layout.short_side));
   }
+  // The status floats over the top of the list instead of taking a row in
+  // the layout, so showing "Loading" during a letter jump moves nothing.
+  ui.library_status_lbl = lv_label_create(body);
+  lv_obj_add_flag(ui.library_status_lbl, LV_OBJ_FLAG_FLOATING);
+  lv_obj_set_width(ui.library_status_lbl, has_index ? LV_PCT(55) : LV_PCT(100));
+  lv_obj_align(ui.library_status_lbl, LV_ALIGN_TOP_RIGHT, 0, 0);
+  lv_obj_set_style_text_align(ui.library_status_lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+  lv_obj_set_style_text_color(ui.library_status_lbl, lv_color_hex(current_theme().text_muted), LV_PART_MAIN);
+  lv_obj_set_style_bg_color(ui.library_status_lbl,
+    lv_color_hex(theme_display_color(current_theme().surface_secondary)), LV_PART_MAIN);
+  lv_obj_set_style_bg_opa(ui.library_status_lbl, LV_OPA_COVER, LV_PART_MAIN);
+  lv_obj_set_style_pad_ver(ui.library_status_lbl, 8, LV_PART_MAIN);
+  if (ctx->label_font) lv_obj_set_style_text_font(ui.library_status_lbl, ctx->label_font, LV_PART_MAIN);
+  lv_obj_add_flag(ui.library_status_lbl, LV_OBJ_FLAG_HIDDEN);
   ui.library_timer = lv_timer_create(media_library_timer_cb, 500, nullptr);
 
   espcontrol::media::LibraryList &list = media_library_list(ctx->entity_id, kind);
