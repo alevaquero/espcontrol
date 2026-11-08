@@ -375,24 +375,51 @@ inline void media_library_open_list(MediaControlCtx *ctx) {
   }
 }
 
+constexpr const char *MEDIA_LIBRARY_PLAY_TIMEOUT = "timeout";
+
+// Clears the starting entry and, when playback began, returns to Controls.
+inline void media_library_play_finished(bool started, bool failed) {
+  MediaControlModalUi &ui = media_control_modal_ui();
+  ui.library_play_call_id = 0;
+  ui.library_starting_index = -1;
+  ui.library_starting_uri.clear();
+  if (started && media_control_visible_tabs(ui.active).contains(MediaControlTab::CONTROLS)) {
+    media_control_select_tab(MediaControlTab::CONTROLS);
+    return;
+  }
+  ui.library_play_failed = failed;
+  media_library_render(ui.active);
+}
+
 inline void media_library_play_result(const std::string &entity_id, uint32_t call_id,
                                       const esphome::api::ActionResponse &response) {
   MediaControlModalUi &ui = media_control_modal_ui();
+  // Already finished: the player started first, or the tab was left.
+  if (!ui.active || ui.active->entity_id != entity_id || ui.library_play_call_id != call_id) return;
   if (!response.is_success()) {
     ESP_LOGW("media_library", "music_assistant.play_media failed for %s: %s",
              entity_id.c_str(), response.get_error_message().c_str());
   }
-  if (!ui.active || ui.active->entity_id != entity_id || ui.library_play_call_id != call_id) return;
-  ui.library_play_call_id = 0;
-  ui.library_starting_index = -1;
-  ui.library_starting_uri.clear();
-  if (response.is_success() &&
-      media_control_visible_tabs(ui.active).contains(MediaControlTab::CONTROLS)) {
-    media_control_select_tab(MediaControlTab::CONTROLS);
-    return;
-  }
-  ui.library_play_failed = !response.is_success();
-  media_library_render(ui.active);
+  // Without an answer the outcome is unknown, so no failure is shown; the
+  // player's own state tells whether it started.
+  const bool timed_out = !response.is_success() &&
+    response.get_error_message() == MEDIA_LIBRARY_PLAY_TIMEOUT;
+  media_library_play_finished(response.is_success(), !response.is_success() && !timed_out);
+}
+
+// Called on player updates while the popup is open: a new track playing
+// means the tapped entry started, so the popup moves on without waiting for
+// Music Assistant's answer.
+inline void media_library_check_started(MediaControlCtx *ctx) {
+  MediaControlModalUi &ui = media_control_modal_ui();
+  if (!ctx || ui.active != ctx || ui.library_play_call_id == 0 || !ctx->playing) return;
+  const std::string now = ctx->title + "\n" + ctx->artist;
+  if (ui.library_play_was_playing && now == ui.library_play_title) return;
+  const uint32_t call_id = ui.library_play_call_id;
+  ESP_LOGI("media_library", "Playback started on %s", ctx->entity_id.c_str());
+  media_library_play_finished(true, false);
+  // Drop the pending answer; it would only repeat what is already known.
+  ha_cancel_action_response_callback(call_id, "started");
 }
 
 inline void media_library_play(MediaControlCtx *ctx, size_t index) {
@@ -427,6 +454,8 @@ inline void media_library_play(MediaControlCtx *ctx, size_t index) {
   ui.library_play_ms = esphome::millis();
   ui.library_starting_index = static_cast<int>(index);
   ui.library_starting_uri = uri;
+  ui.library_play_title = ctx->title + "\n" + ctx->artist;
+  ui.library_play_was_playing = ctx->playing;
   media_library_render(ctx);
   if (!ha_action_send(req)) ha_cancel_action_response_callback(call_id, "send failed");
 }
@@ -437,8 +466,8 @@ inline void media_library_timer_cb(lv_timer_t *) {
   if (!ctx || !ui.library_list) return;
   media_library_expire_request(media_library_shown_list(ctx));
   if (ui.library_play_call_id != 0 &&
-      esphome::millis() - ui.library_play_ms >= espcontrol::media::LIBRARY_REQUEST_TIMEOUT_MS) {
-    ha_cancel_action_response_callback(ui.library_play_call_id, "timeout");
+      esphome::millis() - ui.library_play_ms >= espcontrol::media::LIBRARY_PLAY_TIMEOUT_MS) {
+    ha_cancel_action_response_callback(ui.library_play_call_id, MEDIA_LIBRARY_PLAY_TIMEOUT);
   }
 }
 

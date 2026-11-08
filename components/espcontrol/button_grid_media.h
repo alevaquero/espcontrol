@@ -175,6 +175,10 @@ struct MediaControlModalUi {
   int library_starting_index = -1;
   // URI of the entry being started, so its row stays marked if the list re-sorts.
   std::string library_starting_uri;
+  // Player state when the entry was tapped; a new track playing means it
+  // started, often well before Music Assistant answers the action.
+  std::string library_play_title;
+  bool library_play_was_playing = false;
   int library_rendered_starting = -1;
   uint32_t library_play_call_id = 0;
   uint32_t library_play_ms = 0;
@@ -373,6 +377,7 @@ inline bool media_control_volume_pending_active(MediaControlCtx *ctx);
 inline void media_control_hide_modal();
 inline void media_control_layout_modal(MediaControlCtx *ctx);
 inline void media_control_refresh_modal(MediaControlCtx *ctx);
+inline void media_library_check_started(MediaControlCtx *ctx);
 inline void media_control_refresh_progress(MediaControlCtx *ctx);
 inline void media_control_refresh_volume(MediaControlCtx *ctx);
 inline void media_control_refresh_group_volume(MediaControlCtx *ctx);
@@ -3082,6 +3087,7 @@ inline void media_control_refresh_modal(MediaControlCtx *ctx) {
   media_control_refresh_speakers(ctx);
   media_control_refresh_power(ctx);
   media_control_refresh_playback_modes(ctx);
+  media_library_check_started(ctx);
 }
 
 inline void media_control_set_volume_value(MediaControlCtx *ctx, int pct) {
@@ -4454,6 +4460,8 @@ inline void media_control_clear_tab_content() {
   ui.library_last_scroll_ms = 0;
   ui.library_starting_index = -1;
   ui.library_starting_uri.clear();
+  ui.library_play_title.clear();
+  ui.library_play_was_playing = false;
   ui.library_rendered_starting = -1;
   ui.library_play_call_id = 0;
   ui.library_play_ms = 0;

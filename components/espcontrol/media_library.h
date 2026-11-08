@@ -32,6 +32,9 @@ constexpr size_t LIBRARY_PAGE_SIZE = 50;
 // letter keys know every entry after a few round trips.
 constexpr size_t LIBRARY_BULK_PAGE_SIZE = 200;
 constexpr uint32_t LIBRARY_REQUEST_TIMEOUT_MS = 15000;
+// Starting an artist makes Music Assistant queue all of their tracks first,
+// which can take well over 15 seconds.
+constexpr uint32_t LIBRARY_PLAY_TIMEOUT_MS = 60000;
 // Libraries are re-read when a tab is opened after this long.
 constexpr uint32_t LIBRARY_STALE_MS = 10UL * 60UL * 1000UL;
 
