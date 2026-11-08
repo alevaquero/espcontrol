@@ -300,6 +300,9 @@ touchscreen:
     i2c_id: bus_a
     # TP_RST is routed to GPIO23; TP_INT is not fitted by default.
     reset_pin: GPIO23
+    # Without TP_INT the controller is polled. The 50ms default makes drags
+    # and list scrolling feel laggy, so poll at roughly the display frame rate.
+    update_interval: 16ms
     on_touch:
       - script.execute: cover_art_handle_touch
 
