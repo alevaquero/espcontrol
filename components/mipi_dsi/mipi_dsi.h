@@ -122,7 +122,8 @@ class MipiDsi final : public display::Display {
                      const uint8_t *&out);
   bool ensure_rotation_buffers_();
   uint8_t *rotate_buf_{nullptr};
-  uint8_t *rotate_cpu_buf_{nullptr};
+  // The panel's frame buffer; CPU rotation writes straight into it.
+  uint8_t *frame_buffer_{nullptr};
   size_t rotate_buf_size_{0};
   ppa_client_handle_t ppa_client_{nullptr};
   SemaphoreHandle_t ppa_done_{nullptr};

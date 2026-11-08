@@ -340,17 +340,21 @@ bool MipiDsi::rotate_block_(const uint8_t *src, int w, int h, int rotation, cons
       ESP_LOGW(TAG, "PPA rotation could not start; rotating this block on the CPU");
     }
   }
-  uint8_t *dst = this->ppa_timeouts_ == 0 ? this->rotate_buf_ : this->rotate_cpu_buf_;
-  if (dst == nullptr) {
-    this->rotate_cpu_buf_ = static_cast<uint8_t *>(
-        heap_caps_aligned_alloc(ROTATION_BUFFER_ALIGN, this->rotate_buf_size_, MALLOC_CAP_SPIRAM));
-    dst = this->rotate_cpu_buf_;
-    if (dst == nullptr) {
-      ESP_LOGE(TAG, "Could not allocate the CPU rotation buffer");
+  // Rotate straight into the frame buffer. The panel driver sees the block
+  // already in place and only flushes the cache, so each update passes
+  // through PSRAM once instead of being written to a buffer and copied. The
+  // panel reads the frame buffer from PSRAM continuously, and the extra copy
+  // competes with it for bandwidth.
+  if (this->frame_buffer_ == nullptr) {
+    void *frame_buffer = nullptr;
+    if (esp_lcd_dpi_panel_get_frame_buffer(this->handle_, 1, &frame_buffer) != ESP_OK || frame_buffer == nullptr) {
+      ESP_LOGE(TAG, "Could not get the frame buffer for CPU rotation");
       return false;
     }
+    this->frame_buffer_ = static_cast<uint8_t *>(frame_buffer);
   }
-  rotate_block_cpu(src, dst, w, h, bpp, rotation);
+  uint8_t *dst = this->frame_buffer_ + (static_cast<size_t>(target.y) * this->width_ + target.x) * bpp;
+  rotate_block_cpu(src, dst, w, h, bpp, rotation, this->width_);
   out = dst;
   return true;
 }

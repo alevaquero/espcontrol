@@ -50,6 +50,27 @@ int main() {
           assert(bytes_out[(by * block.w + bx) * 3 + b] == bytes[(ly * w + lx) * 3 + b]);
       }
     }
+    // Written straight into a whole frame buffer: every pixel lands at its
+    // panel position and nothing outside the block is touched.
+    std::vector<uint16_t> frame(panel_w * panel_h, 0xBEEF);
+    rotate_block_cpu(reinterpret_cast<const uint8_t *>(src.data()),
+                     reinterpret_cast<uint8_t *>(frame.data() + block.y * panel_w + block.x), w, h, 2, rotation,
+                     panel_w);
+    std::vector<uint8_t> frame_bytes(panel_w * panel_h * 3, 0x5A);
+    rotate_block_cpu(bytes.data(), frame_bytes.data() + (block.y * panel_w + block.x) * 3, w, h, 3, rotation,
+                     panel_w);
+    for (int py = 0; py < panel_h; py++) {
+      for (int px = 0; px < panel_w; px++) {
+        const bool inside = px >= block.x && px < block.x + block.w && py >= block.y && py < block.y + block.h;
+        const uint16_t expected = inside ? dst[(py - block.y) * block.w + (px - block.x)] : 0xBEEF;
+        assert(frame[py * panel_w + px] == expected);
+        for (int b = 0; b < 3; b++) {
+          const uint8_t expected_byte =
+              inside ? bytes_out[((py - block.y) * block.w + (px - block.x)) * 3 + b] : 0x5A;
+          assert(frame_bytes[(py * panel_w + px) * 3 + b] == expected_byte);
+        }
+      }
+    }
   }
   std::puts("Driver rotation places every pixel where draw_pixel_at would");
 }
