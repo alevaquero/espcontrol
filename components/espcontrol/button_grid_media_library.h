@@ -141,6 +141,9 @@ inline void media_library_style_row(MediaControlCtx *ctx, lv_obj_t *row, bool st
   const uint32_t text = starting ? readable_text_color_for_bg(bg) : current_theme().text_primary;
   theme_set_content_background(row, starting);
   lv_obj_set_style_bg_color(row, lv_color_hex(bg), LV_PART_MAIN);
+  // Rows are plain text; only the entry being started is filled. Fewer
+  // filled shapes keep each scrolled frame cheap to draw.
+  lv_obj_set_style_bg_opa(row, starting ? LV_OPA_COVER : LV_OPA_TRANSP, LV_PART_MAIN);
   for (uint32_t i = 0; i < lv_obj_get_child_cnt(row); ++i) {
     lv_obj_set_style_text_color(lv_obj_get_child(row, i), lv_color_hex(text), LV_PART_MAIN);
   }
@@ -170,6 +173,24 @@ inline void media_library_render(MediaControlCtx *ctx) {
   const lv_coord_t gap = pitch - ui.library_row_h;
   const lv_coord_t total_h = count ? static_cast<lv_coord_t>(count) * pitch - gap : 0;
   if (lv_obj_get_height(ui.library_spacer) != total_h) lv_obj_set_height(ui.library_spacer, total_h);
+  if (ui.library_pending_key) {
+    const int index = espcontrol::media::library_index_find(list.items, ui.library_pending_key);
+    if (index >= 0 || list.complete || list.failed ||
+        count >= MEDIA_LIBRARY_MAX_ITEMS) {
+      // Found, or nothing later exists: show the match, else the last entry.
+      ui.library_pending_key = 0;
+      const size_t target = index >= 0 ? static_cast<size_t>(index) : (count ? count - 1 : 0);
+      lv_obj_update_layout(ui.library_list);
+      const lv_coord_t max_y = total_h - lv_obj_get_content_height(ui.library_list);
+      lv_coord_t y = static_cast<lv_coord_t>(target) * pitch;
+      if (y > max_y) y = max_y > 0 ? max_y : 0;
+      // A real scroll re-enters this function through LV_EVENT_SCROLL; the
+      // rest of this pass then places rows for the new position anyway.
+      lv_obj_scroll_to_y(ui.library_list, y, LV_ANIM_OFF);
+    } else if (!list.loading) {
+      media_library_request(ctx->entity_id, kind, count);
+    }
+  }
 
   const size_t first = espcontrol::media::library_first_visible(
     lv_obj_get_scroll_y(ui.library_list), pitch, count);
@@ -189,7 +210,7 @@ inline void media_library_render(MediaControlCtx *ctx) {
     if (moved) {
       lv_obj_set_user_data(row, tag);
       lv_obj_set_y(row, static_cast<lv_coord_t>(index) * pitch);
-      lv_obj_t *name = lv_obj_get_child(row, 1);
+      lv_obj_t *name = lv_obj_get_child(row, 0);
       if (name) lv_label_set_display_text(name, list.items[index].name.c_str());
       lv_obj_clear_flag(row, LV_OBJ_FLAG_HIDDEN);
     }
@@ -199,6 +220,7 @@ inline void media_library_render(MediaControlCtx *ctx) {
   }
 
   if (ui.library_play_failed) media_library_set_status(espcontrol_i18n("Playback failed"));
+  else if (ui.library_pending_key) media_library_set_status(espcontrol_i18n("Loading"));
   else if (count) media_library_set_status(nullptr);
   else if (list.loading) media_library_set_status(espcontrol_i18n("Loading"));
   else if (list.failed) media_library_set_status(espcontrol_i18n("Could not load"));
@@ -278,14 +300,13 @@ inline void media_library_timer_cb(lv_timer_t *) {
 
 inline lv_obj_t *media_library_create_row(MediaControlCtx *ctx, lv_obj_t *parent,
                                           lv_coord_t height, lv_coord_t short_side) {
-  MediaControlModalUi &ui = media_control_modal_ui();
   lv_obj_t *row = lv_btn_create(parent);
   lv_obj_add_flag(row, LV_OBJ_FLAG_HIDDEN);
   lv_obj_set_size(row, LV_PCT(100), height);
   lv_obj_set_style_radius(row, control_modal_card_radius(ctx->btn), LV_PART_MAIN);
   lv_obj_set_style_border_width(row, 0, LV_PART_MAIN);
   lv_obj_set_style_shadow_width(row, 0, LV_PART_MAIN);
-  lv_obj_set_style_bg_opa(row, LV_OPA_COVER, LV_PART_MAIN);
+  lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, LV_PART_MAIN);
   const lv_coord_t pad_x = control_modal_scaled_px(18, short_side);
   lv_obj_set_style_pad_left(row, pad_x, LV_PART_MAIN);
   lv_obj_set_style_pad_right(row, pad_x, LV_PART_MAIN);
@@ -298,12 +319,6 @@ inline lv_obj_t *media_library_create_row(MediaControlCtx *ctx, lv_obj_t *parent
   lv_obj_set_style_flex_track_place(row, LV_FLEX_ALIGN_CENTER, LV_PART_MAIN);
   lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
   control_modal_apply_pressed_fill(row);
-
-  lv_obj_t *icon = lv_label_create(row);
-  lv_label_set_display_text(icon, find_icon(espcontrol::media::library_icon_name(
-    media_library_kind_for_tab(ui.tab))));
-  if (ctx->icon_font) lv_obj_set_style_text_font(icon, ctx->icon_font, LV_PART_MAIN);
-  apply_icon_width_compensation(icon, MEDIA_CONTROL_SPEAKER_ROW_ICON_ZOOM);
 
   lv_obj_t *name = lv_label_create(row);
   lv_obj_set_flex_grow(name, 1);
@@ -322,6 +337,50 @@ inline lv_obj_t *media_library_create_row(MediaControlCtx *ctx, lv_obj_t *parent
   return row;
 }
 
+// Letter keys beside the Artists list. Tapping one scrolls to the first
+// entry at or after that letter, loading further pages first if needed.
+inline void media_library_create_index(MediaControlCtx *ctx, lv_obj_t *parent) {
+  MediaControlModalUi &ui = media_control_modal_ui();
+  ui.library_index = lv_obj_create(parent);
+  lv_obj_t *index = ui.library_index;
+  lv_obj_set_height(index, LV_PCT(100));
+  lv_obj_set_flex_grow(index, 45);
+  lv_obj_set_style_bg_opa(index, LV_OPA_TRANSP, LV_PART_MAIN);
+  lv_obj_set_style_border_width(index, 0, LV_PART_MAIN);
+  lv_obj_set_style_pad_all(index, 0, LV_PART_MAIN);
+  lv_obj_set_style_pad_row(index, 6, LV_PART_MAIN);
+  lv_obj_set_style_pad_column(index, 6, LV_PART_MAIN);
+  lv_obj_set_layout(index, LV_LAYOUT_FLEX);
+  lv_obj_set_style_flex_flow(index, LV_FLEX_FLOW_ROW_WRAP, LV_PART_MAIN);
+  lv_obj_set_style_flex_main_place(index, LV_FLEX_ALIGN_START, LV_PART_MAIN);
+  lv_obj_set_style_flex_track_place(index, LV_FLEX_ALIGN_START, LV_PART_MAIN);
+  lv_obj_clear_flag(index, LV_OBJ_FLAG_SCROLLABLE);
+  // 27 keys in 5 columns by 6 rows.
+  for (const char *key = espcontrol::media::LIBRARY_INDEX_KEYS; *key; ++key) {
+    lv_obj_t *btn = lv_btn_create(index);
+    lv_obj_set_size(btn, LV_PCT(18), LV_PCT(15));
+    lv_obj_set_style_radius(btn, control_modal_card_radius(ctx->btn), LV_PART_MAIN);
+    lv_obj_set_style_border_width(btn, 0, LV_PART_MAIN);
+    lv_obj_set_style_shadow_width(btn, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(btn, 0, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(btn, lv_color_hex(theme_display_color(current_theme().surface_primary)), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
+    control_modal_apply_pressed_fill(btn);
+    lv_obj_t *label = lv_label_create(btn);
+    const char text[2] = {*key, 0};
+    lv_label_set_text(label, text);
+    if (ctx->label_font) lv_obj_set_style_text_font(label, ctx->label_font, LV_PART_MAIN);
+    lv_obj_set_style_text_color(label, lv_color_hex(current_theme().text_primary), LV_PART_MAIN);
+    lv_obj_center(label);
+    lv_obj_add_event_cb(btn, [](lv_event_t *event) {
+      MediaControlModalUi &ui = media_control_modal_ui();
+      if (!ui.active || !ui.library_list) return;
+      ui.library_pending_key = static_cast<char>(reinterpret_cast<uintptr_t>(lv_event_get_user_data(event)));
+      media_library_render(ui.active);
+    }, LV_EVENT_CLICKED, reinterpret_cast<void *>(static_cast<uintptr_t>(static_cast<unsigned char>(*key))));
+  }
+}
+
 inline void media_control_create_library_tab_content(MediaControlCtx *ctx) {
   MediaControlModalUi &ui = media_control_modal_ui();
   if (!ctx || !ui.content_box || ui.library_list) return;
@@ -338,9 +397,21 @@ inline void media_control_create_library_tab_content(MediaControlCtx *ctx) {
   if (ctx->label_font) lv_obj_set_style_text_font(ui.library_status_lbl, ctx->label_font, LV_PART_MAIN);
   lv_obj_add_flag(ui.library_status_lbl, LV_OBJ_FLAG_HIDDEN);
 
-  ui.library_list = lv_obj_create(ui.content_box);
-  lv_obj_set_width(ui.library_list, LV_PCT(100));
-  lv_obj_set_flex_grow(ui.library_list, 1);
+  lv_obj_t *body = lv_obj_create(ui.content_box);
+  lv_obj_set_width(body, LV_PCT(100));
+  lv_obj_set_flex_grow(body, 1);
+  lv_obj_set_style_bg_opa(body, LV_OPA_TRANSP, LV_PART_MAIN);
+  lv_obj_set_style_border_width(body, 0, LV_PART_MAIN);
+  lv_obj_set_style_pad_all(body, 0, LV_PART_MAIN);
+  lv_obj_set_style_pad_column(body, control_modal_scaled_px(18, layout.short_side), LV_PART_MAIN);
+  lv_obj_set_layout(body, LV_LAYOUT_FLEX);
+  lv_obj_set_style_flex_flow(body, LV_FLEX_FLOW_ROW, LV_PART_MAIN);
+  lv_obj_clear_flag(body, LV_OBJ_FLAG_SCROLLABLE);
+  if (kind == espcontrol::media::LibraryKind::ARTIST) media_library_create_index(ctx, body);
+
+  ui.library_list = lv_obj_create(body);
+  lv_obj_set_height(ui.library_list, LV_PCT(100));
+  lv_obj_set_flex_grow(ui.library_list, 55);
   lv_obj_set_style_bg_opa(ui.library_list, LV_OPA_TRANSP, LV_PART_MAIN);
   lv_obj_set_style_border_width(ui.library_list, 0, LV_PART_MAIN);
   lv_obj_set_style_pad_all(ui.library_list, 0, LV_PART_MAIN);

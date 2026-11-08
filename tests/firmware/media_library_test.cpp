@@ -54,4 +54,23 @@ int main() {
          "{{ config_entry_id('media_player.kitchen') }}");
   assert(std::string(library_media_type(LibraryKind::RADIO)) == "radio");
   assert(std::string(library_icon_name(LibraryKind::ARTIST)) == "Account Music");
+
+  // Letter index: case-insensitive, "The " skipped, non-letters under '#'.
+  assert(library_index_key("adele") == 'A');
+  assert(library_index_key("The Beatles") == 'B');
+  assert(library_index_key("Theory of a Deadman") == 'T');
+  assert(library_index_key("The") == 'T');
+  assert(library_index_key("  2Pac") == '#');
+  assert(library_index_key("") == '#');
+  std::vector<LibraryItem> artists = {
+    {"10cc", "u0"}, {"ABBA", "u1"}, {"The Beatles", "u2"}, {"Coldplay", "u3"},
+    {"Daft Punk", "u4"}, {"Hozier", "u5"},
+  };
+  assert(library_index_find(artists, '#') == 0);
+  assert(library_index_find(artists, 'B') == 2);
+  // A missing letter lands on the next one that exists.
+  assert(library_index_find(artists, 'E') == 5);
+  assert(library_index_find(artists, 'H') == 5);
+  // Past every loaded entry: more pages may be needed.
+  assert(library_index_find(artists, 'Z') == -1);
 }

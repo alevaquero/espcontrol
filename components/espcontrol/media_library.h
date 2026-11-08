@@ -138,4 +138,41 @@ inline size_t library_first_visible(int scroll_y, int row_pitch, size_t count) {
   return first >= count ? count - 1 : first;
 }
 
+// Letter index for jumping through a library. Keys are '#' (anything that
+// does not start with a letter) and 'A'..'Z'. A leading "The " is skipped,
+// matching how Music Assistant sorts names.
+constexpr const char *LIBRARY_INDEX_KEYS = "#ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+inline char library_index_key(const std::string &name) {
+  size_t start = name.find_first_not_of(' ');
+  if (start == std::string::npos) return '#';
+  if (name.size() > start + 4) {
+    const char t = name[start], h = name[start + 1], e = name[start + 2];
+    if ((t == 'T' || t == 't') && (h == 'H' || h == 'h') && (e == 'E' || e == 'e') &&
+        name[start + 3] == ' ') {
+      const size_t next = name.find_first_not_of(' ', start + 4);
+      if (next != std::string::npos) start = next;
+    }
+  }
+  const char ch = name[start];
+  if (ch >= 'a' && ch <= 'z') return static_cast<char>(ch - 'a' + 'A');
+  if (ch >= 'A' && ch <= 'Z') return ch;
+  return '#';
+}
+
+// Position of a key in index order: '#' first, then A..Z.
+inline int library_index_rank(char key) {
+  return key >= 'A' && key <= 'Z' ? key - 'A' + 1 : 0;
+}
+
+// First loaded entry at or after the key, or -1 if every loaded entry comes
+// before it (more pages may still need loading).
+inline int library_index_find(const std::vector<LibraryItem> &items, char key) {
+  const int target = library_index_rank(key);
+  for (size_t i = 0; i < items.size(); ++i) {
+    if (library_index_rank(library_index_key(items[i].name)) >= target) return static_cast<int>(i);
+  }
+  return -1;
+}
+
 }  // namespace espcontrol::media

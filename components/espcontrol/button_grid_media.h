@@ -152,6 +152,9 @@ struct MediaControlModalUi {
   lv_obj_t *library_status_lbl = nullptr;
   lv_obj_t *library_list = nullptr;
   lv_obj_t *library_spacer = nullptr;
+  lv_obj_t *library_index = nullptr;
+  // Letter tapped in the index while its entries are still loading.
+  char library_pending_key = 0;
   std::vector<lv_obj_t *> library_rows;
   lv_timer_t *library_timer = nullptr;
   lv_coord_t library_row_h = 0;
@@ -4420,6 +4423,8 @@ inline void media_control_clear_tab_content() {
   ui.library_status_lbl = nullptr;
   ui.library_list = nullptr;
   ui.library_spacer = nullptr;
+  ui.library_index = nullptr;
+  ui.library_pending_key = 0;
   ui.library_row_h = 0;
   ui.library_row_pitch = 0;
   ui.library_last_scroll_ms = 0;
