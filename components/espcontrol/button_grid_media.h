@@ -7,6 +7,7 @@
 #include "media_power_capability.h"
 #include "media_control_tabs.h"
 #include "media_metadata_policy.h"
+#include "media_library.h"
 
 constexpr lv_coord_t MEDIA_CONTROL_VOLUME_VALUE_Y_REF_PX = -8;
 constexpr int MEDIA_CONTROL_SPEAKERS_TAB_ICON_SCALE_PERCENT = 80;
@@ -115,6 +116,8 @@ struct MediaControlModalUi {
   lv_obj_t *volume_tab = nullptr;
   lv_obj_t *speakers_tab = nullptr;
   lv_obj_t *power_tab = nullptr;
+  // Playlists, Artists, and Radios, in LibraryKind order.
+  lv_obj_t *library_tabs[espcontrol::media::LIBRARY_KIND_COUNT] = {};
   lv_obj_t *content_box = nullptr;
   lv_obj_t *controls_box = nullptr;
   lv_obj_t *progress_box = nullptr;
@@ -146,6 +149,19 @@ struct MediaControlModalUi {
   lv_obj_t *power_btn = nullptr;
   lv_obj_t *power_icon_lbl = nullptr;
   lv_obj_t *power_status_lbl = nullptr;
+  lv_obj_t *library_status_lbl = nullptr;
+  lv_obj_t *library_list = nullptr;
+  lv_obj_t *library_spacer = nullptr;
+  std::vector<lv_obj_t *> library_rows;
+  lv_timer_t *library_timer = nullptr;
+  lv_coord_t library_row_h = 0;
+  lv_coord_t library_row_pitch = 0;
+  uint32_t library_last_scroll_ms = 0;
+  int library_starting_index = -1;
+  int library_rendered_starting = -1;
+  uint32_t library_play_call_id = 0;
+  uint32_t library_play_ms = 0;
+  bool library_play_failed = false;
   MediaControlCtx *active = nullptr;
   MediaControlCtx *display_text_ctx = nullptr;
   std::string display_title;
@@ -348,6 +364,8 @@ inline void media_control_refresh_power(MediaControlCtx *ctx);
 inline void media_control_refresh_playback_modes(MediaControlCtx *ctx);
 inline void media_control_ensure_tab_content(MediaControlCtx *ctx);
 inline void media_control_clear_tab_content();
+inline void media_control_select_tab(MediaControlTab tab);
+inline void media_control_create_library_tab_content(MediaControlCtx *ctx);
 inline void media_control_refresh_speakers(MediaControlCtx *ctx);
 inline void media_control_refresh_group_member_volumes(MediaControlCtx *ctx);
 inline size_t media_control_group_size(MediaControlCtx *ctx);
@@ -3114,6 +3132,9 @@ inline void media_control_apply_tab_visibility() {
     {ui.volume_tab, MediaControlTab::VOLUME},
     {ui.speakers_tab, MediaControlTab::SPEAKERS},
     {ui.power_tab, MediaControlTab::POWER},
+    {ui.library_tabs[0], MediaControlTab::PLAYLISTS},
+    {ui.library_tabs[1], MediaControlTab::ARTISTS},
+    {ui.library_tabs[2], MediaControlTab::RADIOS},
   };
   for (const auto &button : buttons) {
     if (!button.btn) continue;
@@ -3133,21 +3154,45 @@ inline lv_obj_t *media_control_create_tab_button(lv_obj_t *parent, const char *i
   if (!btn) return nullptr;
   light_control_center_icon_label(control_modal_icon_label(btn));
   lv_obj_add_event_cb(btn, [](lv_event_t *e) {
-    MediaControlTab tab = static_cast<MediaControlTab>(
-      reinterpret_cast<uintptr_t>(lv_event_get_user_data(e)));
-    MediaControlModalUi &ui = media_control_modal_ui();
-    if (!media_control_visible_tabs(ui.active).contains(tab)) return;
-    if (ui.tab == tab) return;
-    if (ui.tab == MediaControlTab::SPEAKERS) {
-      ui.speaker_generation++;
-    }
-    media_control_clear_tab_content();
-    ui.tab = tab;
-    media_control_ensure_tab_content(ui.active);
-    media_control_apply_tab_visibility();
-    media_control_layout_modal(ui.active);
+    media_control_select_tab(static_cast<MediaControlTab>(
+      reinterpret_cast<uintptr_t>(lv_event_get_user_data(e))));
   }, LV_EVENT_CLICKED, reinterpret_cast<void *>(static_cast<uintptr_t>(tab)));
   return btn;
+}
+
+inline void media_control_select_tab(MediaControlTab tab) {
+  MediaControlModalUi &ui = media_control_modal_ui();
+  if (!media_control_visible_tabs(ui.active).contains(tab)) return;
+  if (ui.tab == tab) return;
+  if (ui.tab == MediaControlTab::SPEAKERS) {
+    ui.speaker_generation++;
+  }
+  media_control_clear_tab_content();
+  ui.tab = tab;
+  media_control_ensure_tab_content(ui.active);
+  media_control_apply_tab_visibility();
+  media_control_layout_modal(ui.active);
+}
+
+// Library tabs need nothing from the player beyond being configured, so their
+// buttons are created once and only shown when the tab is enabled.
+inline bool media_control_ensure_library_tab_buttons(MediaControlCtx *ctx) {
+  MediaControlModalUi &ui = media_control_modal_ui();
+  if (!ctx || ui.active != ctx) return false;
+  if (ctx->group_only) return true;
+  if (!ui.tab_row) return false;
+  for (size_t i = 0; i < espcontrol::media::LIBRARY_KIND_COUNT; ++i) {
+    const auto kind = static_cast<espcontrol::media::LibraryKind>(i);
+    const MediaControlTab tab = static_cast<MediaControlTab>(
+      static_cast<uint8_t>(MediaControlTab::PLAYLISTS) + i);
+    if (!ctx->control_tabs.contains(tab)) continue;
+    if (!ui.library_tabs[i]) {
+      ui.library_tabs[i] = media_control_create_tab_button(
+        ui.tab_row, find_icon(espcontrol::media::library_icon_name(kind)), ctx->icon_font, tab);
+    }
+    if (!ui.library_tabs[i]) return false;
+  }
+  return true;
 }
 
 inline bool media_control_ensure_progress_tab_button(MediaControlCtx *ctx) {
@@ -4328,6 +4373,12 @@ inline void media_control_clear_tab_content() {
     lv_timer_del(ui.speaker_action_timer);
     ui.speaker_action_timer = nullptr;
   }
+  if (ui.library_timer) {
+    lv_timer_del(ui.library_timer);
+    ui.library_timer = nullptr;
+  }
+  // Library rows are children of the content box and go with it below.
+  std::vector<lv_obj_t *>().swap(ui.library_rows);
   for (MediaSpeakerRowState *row : ui.speaker_rows) {
     media_control_cancel_speaker_action(row, "speaker view closed");
     delete row;
@@ -4366,6 +4417,17 @@ inline void media_control_clear_tab_content() {
   ui.power_btn = nullptr;
   ui.power_icon_lbl = nullptr;
   ui.power_status_lbl = nullptr;
+  ui.library_status_lbl = nullptr;
+  ui.library_list = nullptr;
+  ui.library_spacer = nullptr;
+  ui.library_row_h = 0;
+  ui.library_row_pitch = 0;
+  ui.library_last_scroll_ms = 0;
+  ui.library_starting_index = -1;
+  ui.library_rendered_starting = -1;
+  ui.library_play_call_id = 0;
+  ui.library_play_ms = 0;
+  ui.library_play_failed = false;
   ui.updating_progress = false;
   ui.updating_volume = false;
   ui.progress_layout_ready = false;
@@ -4395,6 +4457,9 @@ inline void media_control_ensure_tab_content(MediaControlCtx *ctx) {
   else if (ui.tab == MediaControlTab::POWER) {
     media_control_create_power_tab_content(ctx);
   }
+  else if (espcontrol::media::control_tab_is_library(ui.tab)) {
+    media_control_create_library_tab_content(ctx);
+  }
 }
 
 inline void media_control_layout_modal(MediaControlCtx *ctx) {
@@ -4403,6 +4468,7 @@ inline void media_control_layout_modal(MediaControlCtx *ctx) {
   if (!media_control_ensure_progress_tab_button(ctx)) return;
   if (!media_control_ensure_speakers_tab_button(ctx)) return;
   if (!media_control_ensure_power_tab_button(ctx)) return;
+  if (!media_control_ensure_library_tab_buttons(ctx)) return;
   media_control_ensure_tab_content(ctx);
   ControlModalLayout layout = control_modal_calc_layout(ctx->width_compensation_percent);
   control_modal_apply_panel_layout(ui.overlay, ui.panel, layout, control_modal_card_radius(ctx->btn));
@@ -4423,7 +4489,7 @@ inline void media_control_layout_modal(MediaControlCtx *ctx) {
     lv_obj_t *btn;
     MediaControlTab tab;
   };
-  MediaControlTabLayout tabs[5] = {};
+  MediaControlTabLayout tabs[espcontrol::media::CONTROL_TAB_COUNT] = {};
   const int tab_count = visible_tabs.count;
   for (int i = 0; i < tab_count; ++i) {
     const auto tab = visible_tabs.tabs[i];
@@ -4434,6 +4500,9 @@ inline void media_control_layout_modal(MediaControlCtx *ctx) {
       case MediaControlTab::VOLUME: btn = ui.volume_tab; break;
       case MediaControlTab::SPEAKERS: btn = ui.speakers_tab; break;
       case MediaControlTab::POWER: btn = ui.power_tab; break;
+      case MediaControlTab::PLAYLISTS: btn = ui.library_tabs[0]; break;
+      case MediaControlTab::ARTISTS: btn = ui.library_tabs[1]; break;
+      case MediaControlTab::RADIOS: btn = ui.library_tabs[2]; break;
     }
     tabs[i] = {btn, tab};
     if (!show_tabs || !tabs[i].btn) continue;
@@ -4796,6 +4865,7 @@ inline void media_control_open_modal(MediaControlCtx *ctx) {
     progress_tab_ready = media_control_ensure_progress_tab_button(ctx);
     media_control_ensure_speakers_tab_button(ctx);
     power_tab_ready = media_control_ensure_power_tab_button(ctx);
+    media_control_ensure_library_tab_buttons(ctx);
   }
 
   ui.content_box = media_control_create_box(ui.panel);
@@ -5152,3 +5222,5 @@ inline void subscribe_media_slider_state(lv_obj_t *btn_ptr,
   media_playback_attach_slider(state, ctx);
   media_playback_subscribe_state(state);
 }
+
+#include "button_grid_media_library.h"

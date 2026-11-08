@@ -9,6 +9,10 @@ enum class MediaControlTab : uint8_t {
   VOLUME = 2,
   SPEAKERS = 3,
   POWER = 4,
+  // Music Assistant library browsers.
+  PLAYLISTS = 5,
+  ARTISTS = 6,
+  RADIOS = 7,
 };
 
 namespace espcontrol::media {
@@ -16,8 +20,10 @@ namespace espcontrol::media {
 constexpr const char *DEFAULT_CONTROL_TABS = "controls|progress|volume|speakers";
 constexpr const char *CONTROL_TABS_WITH_POWER = "controls|progress|volume|speakers|power";
 
+constexpr uint8_t CONTROL_TAB_COUNT = 8;
+
 struct ControlTabs {
-  MediaControlTab tabs[5] = {};
+  MediaControlTab tabs[CONTROL_TAB_COUNT] = {};
   uint8_t count = 0;
 
   bool contains(MediaControlTab tab) const {
@@ -32,7 +38,7 @@ struct ControlTabs {
   }
 
   void add(MediaControlTab tab) {
-    if (count < 5 && !contains(tab)) tabs[count++] = tab;
+    if (count < CONTROL_TAB_COUNT && !contains(tab)) tabs[count++] = tab;
   }
 };
 
@@ -43,6 +49,9 @@ inline const char *control_tab_token(MediaControlTab tab) {
     case MediaControlTab::VOLUME: return "volume";
     case MediaControlTab::SPEAKERS: return "speakers";
     case MediaControlTab::POWER: return "power";
+    case MediaControlTab::PLAYLISTS: return "playlists";
+    case MediaControlTab::ARTISTS: return "artists";
+    case MediaControlTab::RADIOS: return "radios";
   }
   return "controls";
 }
@@ -59,7 +68,7 @@ inline ControlTabs parse_control_tabs(const std::string &value, bool power_avail
     const size_t begin = token.find_first_not_of(" \t\r\n");
     if (begin != std::string::npos) {
       token = token.substr(begin, token.find_last_not_of(" \t\r\n") - begin + 1);
-      for (uint8_t i = 0; i < 5; ++i) {
+      for (uint8_t i = 0; i < CONTROL_TAB_COUNT; ++i) {
         const auto tab = static_cast<MediaControlTab>(i);
         if (token == control_tab_token(tab) && (tab != MediaControlTab::POWER || power_available)) result.add(tab);
       }
@@ -96,6 +105,11 @@ inline ControlTabs visible_control_tabs(const ControlTabs &configured,
   // Keep the modal usable while optional capabilities are unavailable.
   if (!visible.count) visible.add(MediaControlTab::CONTROLS);
   return visible;
+}
+
+inline bool control_tab_is_library(MediaControlTab tab) {
+  return tab == MediaControlTab::PLAYLISTS || tab == MediaControlTab::ARTISTS ||
+         tab == MediaControlTab::RADIOS;
 }
 
 }  // namespace espcontrol::media

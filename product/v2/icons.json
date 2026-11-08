@@ -185,6 +185,11 @@
       "mdi": "account"
     },
     {
+      "name": "Account Music",
+      "codepoint": "F0803",
+      "mdi": "account-music"
+    },
+    {
       "name": "Air Conditioner",
       "codepoint": "F001B",
       "mdi": "air-conditioner"
@@ -835,6 +840,11 @@
       "mdi": "headphones"
     },
     {
+      "name": "Playlist Music",
+      "codepoint": "F0CB8",
+      "mdi": "playlist-music"
+    },
+    {
       "name": "Radiator",
       "codepoint": "F0438",
       "mdi": "radiator"
@@ -938,6 +948,11 @@
       "name": "Lawnmower",
       "codepoint": "F11F7",
       "mdi": "robot-mower"
+    },
+    {
+      "name": "Radio",
+      "codepoint": "F0439",
+      "mdi": "radio"
     },
     {
       "name": "Robot Mower",

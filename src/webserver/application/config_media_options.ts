@@ -161,6 +161,9 @@ export function createConfigMediaOptionsFeature(
             { value: "volume", label: "Volume" },
             { value: "speakers", label: "Speakers" },
             { value: "power", label: "Power" },
+            { value: "playlists", label: "Playlists" },
+            { value: "artists", label: "Artists" },
+            { value: "radios", label: "Radios" },
         ];
     }
     function mediaControlTabs(b: any) {
