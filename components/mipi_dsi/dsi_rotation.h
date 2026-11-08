@@ -31,9 +31,46 @@ inline RotatedBlock rotated_block(int rotation, int x, int y, int w, int h, int 
   }
 }
 
+// 16-bit pixels, processed in square tiles so reads and writes both stay
+// within a few cache lines; a plain row-by-row transpose misses the cache on
+// almost every write.
+inline void rotate_block_rgb565(const uint16_t *src, uint16_t *dst, int w, int h, int rotation) {
+  constexpr int TILE = 16;
+  if (rotation == 180) {
+    const size_t count = static_cast<size_t>(w) * h;
+    for (size_t i = 0; i != count; i++)
+      dst[count - 1 - i] = src[i];
+    return;
+  }
+  for (int ty = 0; ty < h; ty += TILE) {
+    const int y_end = ty + TILE < h ? ty + TILE : h;
+    for (int tx = 0; tx < w; tx += TILE) {
+      const int x_end = tx + TILE < w ? tx + TILE : w;
+      for (int ly = ty; ly != y_end; ly++) {
+        const uint16_t *row = src + static_cast<size_t>(ly) * w;
+        if (rotation == 90) {
+          uint16_t *col = dst + (h - 1 - ly);
+          for (int lx = tx; lx != x_end; lx++)
+            col[static_cast<size_t>(lx) * h] = row[lx];
+        } else {  // 270
+          uint16_t *col = dst + ly;
+          for (int lx = tx; lx != x_end; lx++)
+            col[static_cast<size_t>(w - 1 - lx) * h] = row[lx];
+        }
+      }
+    }
+  }
+}
+
 // Copies a w x h logical block into dst laid out as the physical block
 // returned by rotated_block. bpp is bytes per pixel.
 inline void rotate_block_cpu(const uint8_t *src, uint8_t *dst, int w, int h, int bpp, int rotation) {
+  if (bpp == 2 && rotation != 0 && (reinterpret_cast<uintptr_t>(src) & 1) == 0 &&
+      (reinterpret_cast<uintptr_t>(dst) & 1) == 0) {
+    rotate_block_rgb565(reinterpret_cast<const uint16_t *>(src), reinterpret_cast<uint16_t *>(dst), w, h,
+                        rotation);
+    return;
+  }
   for (int ly = 0; ly != h; ly++) {
     const uint8_t *row = src + static_cast<size_t>(ly) * w * bpp;
     for (int lx = 0; lx != w; lx++) {

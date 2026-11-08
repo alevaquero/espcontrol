@@ -332,8 +332,10 @@ bool MipiDsi::rotate_block_(const uint8_t *src, int w, int h, int rotation, cons
       // and that buffer for the rest of this boot.
       this->ppa_usable_ = false;
       this->ppa_timeouts_++;
-      ESP_LOGW(TAG, "PPA rotation did not finish within %u ms; rotating on the CPU from now on",
-               (unsigned) PPA_ROTATION_TIMEOUT_MS);
+      ESP_LOGW(TAG,
+               "PPA rotation did not finish within %u ms; rotating on the CPU from now on "
+               "(block %dx%d at %d,%d, rotation %d, src=%p)",
+               (unsigned) PPA_ROTATION_TIMEOUT_MS, w, h, target.x, target.y, rotation, src);
     } else {
       ESP_LOGW(TAG, "PPA rotation could not start; rotating this block on the CPU");
     }
