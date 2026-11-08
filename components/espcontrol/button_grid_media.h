@@ -173,6 +173,8 @@ struct MediaControlModalUi {
   lv_coord_t library_row_pitch = 0;
   uint32_t library_last_scroll_ms = 0;
   int library_starting_index = -1;
+  // URI of the entry being started, so its row stays marked if the list re-sorts.
+  std::string library_starting_uri;
   int library_rendered_starting = -1;
   uint32_t library_play_call_id = 0;
   uint32_t library_play_ms = 0;
@@ -4451,6 +4453,7 @@ inline void media_control_clear_tab_content() {
   ui.library_row_pitch = 0;
   ui.library_last_scroll_ms = 0;
   ui.library_starting_index = -1;
+  ui.library_starting_uri.clear();
   ui.library_rendered_starting = -1;
   ui.library_play_call_id = 0;
   ui.library_play_ms = 0;

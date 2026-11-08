@@ -118,9 +118,20 @@ inline void media_library_handle_response(const std::string &entity_id,
         lines, limit, list.items.size(), max_items);
       if (espcontrol::media::library_filter_alphabetical(filter) && list.items.size() > before) {
         espcontrol::media::library_sort(list.items);
-        // Entries may have moved under the rows, so relabel them all.
+        // Entries may have moved under the rows, so relabel them all and
+        // find the entry being started again.
         if (media_library_tab_shows(entity_id, kind, filter)) {
-          for (lv_obj_t *row : media_control_modal_ui().library_rows) lv_obj_set_user_data(row, nullptr);
+          MediaControlModalUi &ui = media_control_modal_ui();
+          for (lv_obj_t *row : ui.library_rows) lv_obj_set_user_data(row, nullptr);
+          if (ui.library_starting_index >= 0) {
+            ui.library_starting_index = -1;
+            for (size_t i = 0; i < list.items.size(); ++i) {
+              if (std::string_view(list.items[i].uri) == ui.library_starting_uri) {
+                ui.library_starting_index = static_cast<int>(i);
+                break;
+              }
+            }
+          }
         }
       }
       list.failed = false;
@@ -181,15 +192,38 @@ inline void media_library_expire_request(espcontrol::media::LibraryList &list) {
   ha_cancel_action_response_callback(list.call_id, "timeout");
 }
 
+inline void media_library_spin_cb(void *arc, int32_t angle) {
+  lv_arc_set_rotation(static_cast<lv_obj_t *>(arc), angle);
+}
+
+// The row being started is filled with the accent colour and shows a
+// spinner until Music Assistant answers.
 inline void media_library_style_row(MediaControlCtx *ctx, lv_obj_t *row, bool starting) {
   const uint32_t bg = starting ? ctx->accent_color
                                : theme_display_color(current_theme().surface_primary);
   const uint32_t text = starting ? readable_text_color_for_bg(bg) : current_theme().text_primary;
   theme_set_content_background(row, starting);
   lv_obj_set_style_bg_color(row, lv_color_hex(bg), LV_PART_MAIN);
-  for (uint32_t i = 0; i < lv_obj_get_child_cnt(row); ++i) {
-    lv_obj_set_style_text_color(lv_obj_get_child(row, i), lv_color_hex(text), LV_PART_MAIN);
+  lv_obj_t *name = lv_obj_get_child(row, 0);
+  if (name) lv_obj_set_style_text_color(name, lv_color_hex(text), LV_PART_MAIN);
+  lv_obj_t *spinner = lv_obj_get_child(row, 1);
+  if (!spinner) return;
+  if (!starting) {
+    lv_anim_delete(spinner, media_library_spin_cb);
+    lv_obj_add_flag(spinner, LV_OBJ_FLAG_HIDDEN);
+    return;
   }
+  lv_obj_set_style_arc_color(spinner, lv_color_hex(text), LV_PART_INDICATOR);
+  lv_obj_clear_flag(spinner, LV_OBJ_FLAG_HIDDEN);
+  if (lv_anim_get(spinner, media_library_spin_cb)) return;
+  lv_anim_t anim;
+  lv_anim_init(&anim);
+  lv_anim_set_var(&anim, spinner);
+  lv_anim_set_exec_cb(&anim, media_library_spin_cb);
+  lv_anim_set_values(&anim, 0, 360);
+  lv_anim_set_duration(&anim, 1000);
+  lv_anim_set_repeat_count(&anim, LV_ANIM_REPEAT_INFINITE);
+  lv_anim_start(&anim);
 }
 
 inline void media_library_set_status(const char *text) {
@@ -351,6 +385,7 @@ inline void media_library_play_result(const std::string &entity_id, uint32_t cal
   if (!ui.active || ui.active->entity_id != entity_id || ui.library_play_call_id != call_id) return;
   ui.library_play_call_id = 0;
   ui.library_starting_index = -1;
+  ui.library_starting_uri.clear();
   if (response.is_success() &&
       media_control_visible_tabs(ui.active).contains(MediaControlTab::CONTROLS)) {
     media_control_select_tab(MediaControlTab::CONTROLS);
@@ -391,6 +426,7 @@ inline void media_library_play(MediaControlCtx *ctx, size_t index) {
   ui.library_play_call_id = call_id;
   ui.library_play_ms = esphome::millis();
   ui.library_starting_index = static_cast<int>(index);
+  ui.library_starting_uri = uri;
   media_library_render(ctx);
   if (!ha_action_send(req)) ha_cancel_action_response_callback(call_id, "send failed");
 }
@@ -433,6 +469,21 @@ inline lv_obj_t *media_library_create_row(MediaControlCtx *ctx, lv_obj_t *parent
   lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
   lv_obj_set_style_text_align(name, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
   if (ctx->label_font) lv_obj_set_style_text_font(name, ctx->label_font, LV_PART_MAIN);
+
+  // Spinner shown while this row's entry is starting.
+  const lv_coord_t spinner_size = height * 2 / 5;
+  lv_obj_t *spinner = lv_arc_create(row);
+  lv_obj_set_size(spinner, spinner_size, spinner_size);
+  lv_obj_remove_style(spinner, nullptr, LV_PART_KNOB);
+  lv_obj_clear_flag(spinner, LV_OBJ_FLAG_CLICKABLE);
+  lv_arc_set_bg_angles(spinner, 0, 360);
+  lv_arc_set_angles(spinner, 0, 90);
+  const lv_coord_t spinner_width = spinner_size / 8 > 2 ? spinner_size / 8 : 2;
+  lv_obj_set_style_arc_width(spinner, spinner_width, LV_PART_MAIN);
+  lv_obj_set_style_arc_width(spinner, spinner_width, LV_PART_INDICATOR);
+  lv_obj_set_style_arc_opa(spinner, LV_OPA_TRANSP, LV_PART_MAIN);
+  lv_obj_set_style_arc_rounded(spinner, true, LV_PART_INDICATOR);
+  lv_obj_add_flag(spinner, LV_OBJ_FLAG_HIDDEN);
 
   lv_obj_add_event_cb(row, [](lv_event_t *event) {
     lv_obj_t *row = static_cast<lv_obj_t *>(lv_event_get_current_target(event));
