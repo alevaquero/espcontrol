@@ -329,10 +329,12 @@ display:
       inverted: true
     update_interval: never
     auto_clear_enabled: false
-    # LVGL rotates this portrait panel with the PPA, which shares the DMA2D
-    # engine with the frame-buffer copy. Copying with the CPU keeps the PPA as
-    # the only DMA2D user while drawing; with both, a rotation job was seen to
-    # never complete and the panel froze until the task watchdog rebooted it.
+    # This portrait panel is always rotated. LVGL's PPA rotation waits forever
+    # for each job, and a lost job froze the panel until the task watchdog
+    # rebooted it. Rotate in the display driver instead, which gives the PPA a
+    # time limit and falls back to the CPU, and copy frames with the CPU so the
+    # PPA is the only DMA2D user while drawing.
+    rotate_in_driver: true
     dma2d_frame_copy: false
     dimensions:
       width: 720

@@ -3,6 +3,7 @@
 #include "mipi_dsi.h"
 #include "dpi_timing.h"
 #include "esp_clk_tree.h"
+#include "esp_heap_caps.h"
 #include "esphome/core/helpers.h"
 
 namespace esphome::mipi_dsi {
@@ -235,7 +236,121 @@ void MipiDsi::draw_pixels_at(int x_start, int y_start, int w, int h, const uint8
                                      x_pad);
     return;
   }
+  const int rotation = static_cast<int>(this->rotation_);
+  if (this->rotate_in_driver_ && rotation != 0) {
+    // Rotated blocks are always whole LVGL draw areas, without offsets.
+    if (x_offset != 0 || y_offset != 0 || x_pad != 0) {
+      display::Display::draw_pixels_at(x_start, y_start, w, h, ptr, order, bitness, big_endian, x_offset, y_offset,
+                                       x_pad);
+      return;
+    }
+    const RotatedBlock target = rotated_block(rotation, x_start, y_start, w, h, this->width_, this->height_);
+    const uint8_t *rotated = nullptr;
+    if (!this->rotate_block_(ptr, w, h, rotation, target, rotated))
+      return;
+    this->write_to_display_(target.x, target.y, target.w, target.h, rotated, 0, 0, 0);
+    return;
+  }
   this->write_to_display_(x_start, y_start, w, h, ptr, x_offset, y_offset, x_pad);
+}
+
+static bool IRAM_ATTR ppa_rotation_done(ppa_client_handle_t, ppa_event_data_t *, void *user_data) {
+  BaseType_t woken = pdFALSE;
+  xSemaphoreGiveFromISR(static_cast<SemaphoreHandle_t>(user_data), &woken);
+  return woken == pdTRUE;
+}
+
+// LVGL's own PPA rotation waits forever; on this panel a rotation job was
+// seen to never complete, freezing the main loop until the task watchdog
+// rebooted. Wait a bounded time instead and finish the block on the CPU.
+static constexpr uint32_t PPA_ROTATION_TIMEOUT_MS = 200;
+static constexpr size_t ROTATION_BUFFER_ALIGN = 64;
+
+bool MipiDsi::ensure_rotation_buffers_() {
+  if (this->rotate_buf_ != nullptr)
+    return true;
+  const size_t bytes = this->width_ * this->height_ * (3 - this->color_depth_);
+  this->rotate_buf_size_ = (bytes + ROTATION_BUFFER_ALIGN - 1) & ~(ROTATION_BUFFER_ALIGN - 1);
+  this->rotate_buf_ = static_cast<uint8_t *>(
+      heap_caps_aligned_alloc(ROTATION_BUFFER_ALIGN, this->rotate_buf_size_, MALLOC_CAP_SPIRAM | MALLOC_CAP_DMA));
+  if (this->rotate_buf_ == nullptr) {
+    ESP_LOGE(TAG, "Could not allocate the rotation buffer");
+    return false;
+  }
+  ppa_client_config_t config{};
+  config.oper_type = PPA_OPERATION_SRM;
+  config.max_pending_trans_num = 1;
+  this->ppa_done_ = xSemaphoreCreateBinary();
+  if (this->ppa_done_ == nullptr || ppa_register_client(&config, &this->ppa_client_) != ESP_OK) {
+    ESP_LOGW(TAG, "PPA unavailable; rotating on the CPU");
+    this->ppa_client_ = nullptr;
+    this->ppa_usable_ = false;
+    return true;
+  }
+  ppa_event_callbacks_t callbacks{};
+  callbacks.on_trans_done = ppa_rotation_done;
+  if (ppa_client_register_event_callbacks(this->ppa_client_, &callbacks) != ESP_OK) {
+    ESP_LOGW(TAG, "PPA callbacks unavailable; rotating on the CPU");
+    this->ppa_usable_ = false;
+  }
+  return true;
+}
+
+bool MipiDsi::rotate_block_(const uint8_t *src, int w, int h, int rotation, const RotatedBlock &target,
+                            const uint8_t *&out) {
+  if (!this->ensure_rotation_buffers_())
+    return false;
+  const int bpp = 3 - this->color_depth_;
+  if (this->ppa_usable_) {
+    ppa_srm_oper_config_t srm{};
+    srm.in.buffer = src;
+    srm.in.pic_w = w;
+    srm.in.pic_h = h;
+    srm.in.block_w = w;
+    srm.in.block_h = h;
+    srm.in.srm_cm = bpp == 2 ? PPA_SRM_COLOR_MODE_RGB565 : PPA_SRM_COLOR_MODE_RGB888;
+    srm.out.buffer = this->rotate_buf_;
+    srm.out.buffer_size = this->rotate_buf_size_;
+    srm.out.pic_w = target.w;
+    srm.out.pic_h = target.h;
+    srm.out.srm_cm = srm.in.srm_cm;
+    // PPA angles are counter-clockwise; display rotations are clockwise.
+    srm.rotation_angle = rotation == 90    ? PPA_SRM_ROTATION_ANGLE_270
+                         : rotation == 270 ? PPA_SRM_ROTATION_ANGLE_90
+                                           : PPA_SRM_ROTATION_ANGLE_180;
+    srm.scale_x = 1.0f;
+    srm.scale_y = 1.0f;
+    srm.mode = PPA_TRANS_MODE_NON_BLOCKING;
+    srm.user_data = this->ppa_done_;
+    xSemaphoreTake(this->ppa_done_, 0);  // drop any stale completion
+    if (ppa_do_scale_rotate_mirror(this->ppa_client_, &srm) == ESP_OK) {
+      if (xSemaphoreTake(this->ppa_done_, pdMS_TO_TICKS(PPA_ROTATION_TIMEOUT_MS)) == pdTRUE) {
+        out = this->rotate_buf_;
+        return true;
+      }
+      // The lost job may still write into rotate_buf_, so stop using the PPA
+      // and that buffer for the rest of this boot.
+      this->ppa_usable_ = false;
+      this->ppa_timeouts_++;
+      ESP_LOGW(TAG, "PPA rotation did not finish within %u ms; rotating on the CPU from now on",
+               (unsigned) PPA_ROTATION_TIMEOUT_MS);
+    } else {
+      ESP_LOGW(TAG, "PPA rotation could not start; rotating this block on the CPU");
+    }
+  }
+  uint8_t *dst = this->ppa_timeouts_ == 0 ? this->rotate_buf_ : this->rotate_cpu_buf_;
+  if (dst == nullptr) {
+    this->rotate_cpu_buf_ = static_cast<uint8_t *>(
+        heap_caps_aligned_alloc(ROTATION_BUFFER_ALIGN, this->rotate_buf_size_, MALLOC_CAP_SPIRAM));
+    dst = this->rotate_cpu_buf_;
+    if (dst == nullptr) {
+      ESP_LOGE(TAG, "Could not allocate the CPU rotation buffer");
+      return false;
+    }
+  }
+  rotate_block_cpu(src, dst, w, h, bpp, rotation);
+  out = dst;
+  return true;
 }
 
 void MipiDsi::write_to_display_(int x_start, int y_start, int w, int h, const uint8_t *ptr, int x_offset, int y_offset,
@@ -443,11 +558,13 @@ void MipiDsi::dump_config() {
                 "\n  Display Pixel Mode: %d bit"
                 "\n  Invert Colors: %s"
                 "\n  Frame Copy: %s"
+                "\n  Rotation In Driver: %s"
                 "\n  Pixel Clock: %.1fMHz",
                 this->model_, this->width_, this->height_, this->rotation_, this->lanes_, this->lane_bit_rate_,
                 this->hsync_pulse_width_, this->hsync_back_porch_, this->hsync_front_porch_, this->vsync_pulse_width_,
                 this->vsync_back_porch_, this->vsync_front_porch_, (3 - this->color_depth_) * 8, this->pixel_mode_,
-                YESNO(this->invert_colors_), this->dma2d_frame_copy_ ? "DMA2D" : "CPU", this->pclk_frequency_);
+                YESNO(this->invert_colors_), this->dma2d_frame_copy_ ? "DMA2D" : "CPU",
+                YESNO(this->rotate_in_driver_), this->pclk_frequency_);
   LOG_PIN("  Reset Pin ", this->reset_pin_);
 }
 }  // namespace esphome::mipi_dsi
