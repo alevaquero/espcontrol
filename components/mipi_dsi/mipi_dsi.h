@@ -59,6 +59,7 @@ class MipiDsi final : public display::Display {
   void set_model(const char *model) { this->model_ = model; }
   void set_lane_bit_rate(float lane_bit_rate) { this->lane_bit_rate_ = lane_bit_rate; }
   void set_lanes(uint8_t lanes) { this->lanes_ = lanes; }
+  void set_dma2d_frame_copy(bool enabled) { this->dma2d_frame_copy_ = enabled; }
 
   void smark_failed(const LogString *message, esp_err_t err);
 
@@ -109,6 +110,7 @@ class MipiDsi final : public display::Display {
   // completion never arrived, so a lost interrupt cannot hang the main loop.
   bool wait_for_transfer_();
   uint32_t transfer_timeouts_{0};
+  bool dma2d_frame_copy_{true};
   uint8_t *buffer_{nullptr};
   uint16_t x_low_{1};
   uint16_t y_low_{1};

@@ -92,7 +92,7 @@ void MipiDsi::setup() {
                                                },
                                            .flags = {
 #if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(6, 0, 0)
-                                               .use_dma2d = true,
+                                               .use_dma2d = this->dma2d_frame_copy_,
 #endif
                                            }};
   // clang-format on
@@ -442,11 +442,12 @@ void MipiDsi::dump_config() {
                 "\n  Buffer Color Depth: %d bit"
                 "\n  Display Pixel Mode: %d bit"
                 "\n  Invert Colors: %s"
+                "\n  Frame Copy: %s"
                 "\n  Pixel Clock: %.1fMHz",
                 this->model_, this->width_, this->height_, this->rotation_, this->lanes_, this->lane_bit_rate_,
                 this->hsync_pulse_width_, this->hsync_back_porch_, this->hsync_front_porch_, this->vsync_pulse_width_,
                 this->vsync_back_porch_, this->vsync_front_porch_, (3 - this->color_depth_) * 8, this->pixel_mode_,
-                YESNO(this->invert_colors_), this->pclk_frequency_);
+                YESNO(this->invert_colors_), this->dma2d_frame_copy_ ? "DMA2D" : "CPU", this->pclk_frequency_);
   LOG_PIN("  Reset Pin ", this->reset_pin_);
 }
 }  // namespace esphome::mipi_dsi
