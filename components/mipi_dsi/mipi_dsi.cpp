@@ -248,7 +248,7 @@ void MipiDsi::write_to_display_(int x_start, int y_start, int w, int h, const ui
   if (x_offset == 0 && x_pad == 0) {
     err = esp_lcd_panel_draw_bitmap(this->handle_, x_start, y_start, x_start + w, y_start + h, ptr);
     if (err == ESP_OK)
-      xSemaphoreTake(this->io_lock_, portMAX_DELAY);
+      this->wait_for_transfer_();
 
   } else {
     // draw line by line
@@ -257,12 +257,28 @@ void MipiDsi::write_to_display_(int x_start, int y_start, int w, int h, const ui
       if (err != ESP_OK)
         break;
       ptr += stride;  // next line
-      xSemaphoreTake(this->io_lock_, portMAX_DELAY);
+      if (!this->wait_for_transfer_())
+        break;
     }
   }
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "lcd_lcd_panel_draw_bitmap failed: %s", esp_err_to_name(err));
   }
+}
+
+// A DMA2D frame-buffer copy takes a few milliseconds. The completion interrupt
+// has been seen to go missing while other DMA2D users (JPEG and PPA artwork
+// decoding) are active; waiting forever then stalled the main loop until the
+// task watchdog rebooted the panel. Give up after a generous limit instead.
+static constexpr uint32_t TRANSFER_TIMEOUT_MS = 500;
+
+bool MipiDsi::wait_for_transfer_() {
+  if (xSemaphoreTake(this->io_lock_, pdMS_TO_TICKS(TRANSFER_TIMEOUT_MS)) == pdTRUE)
+    return true;
+  this->transfer_timeouts_++;
+  ESP_LOGW(TAG, "Display transfer did not finish within %u ms (%u times); continuing",
+           (unsigned) TRANSFER_TIMEOUT_MS, (unsigned) this->transfer_timeouts_);
+  return false;
 }
 
 bool MipiDsi::check_buffer_() {

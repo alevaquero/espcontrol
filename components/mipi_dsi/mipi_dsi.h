@@ -105,6 +105,10 @@ class MipiDsi final : public display::Display {
   esp_lcd_dsi_bus_handle_t bus_handle_{};
   esp_lcd_panel_io_handle_t io_handle_{};
   SemaphoreHandle_t io_lock_{};
+  // Waits for the DMA2D copy of one draw to finish. Returns false if the
+  // completion never arrived, so a lost interrupt cannot hang the main loop.
+  bool wait_for_transfer_();
+  uint32_t transfer_timeouts_{0};
   uint8_t *buffer_{nullptr};
   uint16_t x_low_{1};
   uint16_t y_low_{1};
