@@ -1,4 +1,4 @@
-export const MEDIA_CONTROL_TABS = ["controls", "progress", "volume", "speakers", "power"] as const;
+export const MEDIA_CONTROL_TABS = ["controls", "progress", "volume", "speakers", "power", "playlists", "artists", "radios"] as const;
 export const MEDIA_CONTROL_DEFAULT_TABS = ["controls", "progress", "volume", "speakers"] as const;
 export type MediaControlTab = typeof MEDIA_CONTROL_TABS[number];
 

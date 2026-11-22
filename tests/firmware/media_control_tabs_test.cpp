@@ -27,4 +27,14 @@ int main() {
   // Hidden native power remains hidden even after its capability appears.
   visible = visible_control_tabs(parse_control_tabs("volume|controls"), true, true, true);
   assert(!visible.contains(Tab::POWER));
+  // Library tabs are opt-in and keep their configured order.
+  assert(!defaults.contains(Tab::PLAYLISTS));
+  assert(normalize_control_tabs_value("radios|controls|playlists|artists") ==
+         "radios|controls|playlists|artists");
+  const auto every = parse_control_tabs(
+    "controls|progress|volume|speakers|power|playlists|artists|radios", true);
+  assert(every.count == CONTROL_TAB_COUNT);
+  visible = visible_control_tabs(every, false, false, false);
+  assert(visible.count == 5 && visible.tabs[2] == Tab::PLAYLISTS && visible.tabs[4] == Tab::RADIOS);
+  assert(control_tab_is_library(Tab::ARTISTS) && !control_tab_is_library(Tab::SPEAKERS));
 }

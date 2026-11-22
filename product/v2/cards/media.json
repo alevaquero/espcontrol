@@ -167,7 +167,10 @@
         "progress",
         "volume",
         "speakers",
-        "power"
+        "power",
+        "playlists",
+        "artists",
+        "radios"
       ],
       "defaultValue": "controls|progress|volume|speakers",
       "omitDefault": true,

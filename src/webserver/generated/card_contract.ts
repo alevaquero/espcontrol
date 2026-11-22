@@ -2783,7 +2783,10 @@ export const CARD_CONTRACT_CARDS: Readonly<Record<string, CardTypeSpec>> = {
           "progress",
           "volume",
           "speakers",
-          "power"
+          "power",
+          "playlists",
+          "artists",
+          "radios"
         ],
         "defaultValue": "controls|progress|volume|speakers",
         "omitDefault": true,
