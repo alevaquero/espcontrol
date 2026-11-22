@@ -83,6 +83,33 @@ struct MediaControlCtx {
   bool group_only = false;
 };
 
+// What a speaker row last drew. Home Assistant updates refresh every row, so
+// rows compare against this and skip LVGL work when nothing visible changed.
+// Restyling all rows on each update forced full relayouts and redraws of the
+// list, which made scrolling long speaker lists stutter.
+struct MediaSpeakerRowVisual {
+  bool applied = false;
+  bool selected = false;
+  bool available = false;
+  bool clickable = false;
+  bool show_volume = false;
+  bool minus_enabled = false;
+  bool plus_enabled = false;
+  uint32_t bg_color = 0;
+  uint32_t text_color = 0;
+  lv_coord_t height = 0;
+  std::string name;
+  std::string volume;
+  bool operator==(const MediaSpeakerRowVisual &other) const {
+    return applied == other.applied && selected == other.selected &&
+           available == other.available && clickable == other.clickable &&
+           show_volume == other.show_volume && minus_enabled == other.minus_enabled &&
+           plus_enabled == other.plus_enabled && bg_color == other.bg_color &&
+           text_color == other.text_color && height == other.height &&
+           name == other.name && volume == other.volume;
+  }
+};
+
 struct MediaSpeakerRowState {
   std::string entity_id;
   std::string friendly_name;
@@ -103,6 +130,7 @@ struct MediaSpeakerRowState {
   lv_obj_t *volume_controls = nullptr;
   lv_obj_t *volume_minus_btn = nullptr;
   lv_obj_t *volume_plus_btn = nullptr;
+  MediaSpeakerRowVisual visual;
 };
 
 struct MediaControlModalUi {
@@ -3670,33 +3698,56 @@ inline void media_control_refresh_speaker_row(MediaControlCtx *ctx,
   if (!ctx || !row) return;
   if (!row->pending) row->selected = media_control_group_contains(ctx, row->entity_id);
   const bool show_volume = media_control_speaker_row_shows_volume(ctx, row);
-  const bool visible = true;
-  const uint32_t bg_color = row->selected ? ctx->accent_color : theme_display_color(current_theme().surface_primary);
-  const uint32_t text_color = row->selected ? readable_text_color_for_bg(bg_color)
-                                            : current_theme().text_primary;
+  const bool volume_enabled = show_volume && row->available && row->volume_known;
+  MediaSpeakerRowVisual next;
+  next.applied = true;
+  next.selected = row->selected;
+  next.available = row->available;
+  next.clickable = row->available && !row->pending &&
+    (!row->selected || row->entity_id != ctx->entity_id);
+  next.show_volume = show_volume;
+  next.minus_enabled = volume_enabled && row->volume_pct > 0;
+  next.plus_enabled = volume_enabled && row->volume_pct < media_control_volume_max_pct(ctx);
+  next.bg_color = row->selected ? ctx->accent_color : theme_display_color(current_theme().surface_primary);
+  next.text_color = row->selected ? readable_text_color_for_bg(next.bg_color)
+                                  : current_theme().text_primary;
+  next.height = -1;
+  if (row->row && media_control_modal_ui().active == ctx) {
+    ControlModalLayout layout = control_modal_calc_layout(ctx->width_compensation_percent);
+    next.height = media_control_speaker_row_height(ctx, row, layout.short_side);
+  }
+  next.name = row->friendly_name.empty()
+    ? media_control_speaker_fallback_name(row->entity_id) : row->friendly_name;
+  if (row->volume_known) {
+    char value[8];
+    snprintf(value, sizeof(value), "%d%%", row->volume_pct);
+    next.volume = value;
+  } else {
+    next.volume = "--";
+  }
+  if (row->visual == next) return;
+  row->visual = next;
+
+  // Unavailable rows are dimmed through their own background and text
+  // opacity. A whole-object opacity would make LVGL render each such row into
+  // a separate layer on every scroll frame.
+  const lv_opa_t text_opa = row->available ? LV_OPA_COVER : LV_OPA_50;
   if (row->row) {
-    if (visible) lv_obj_clear_flag(row->row, LV_OBJ_FLAG_HIDDEN);
-    else lv_obj_add_flag(row->row, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(row->row, LV_OBJ_FLAG_HIDDEN);
     theme_set_content_background(row->row, row->selected);
-    lv_obj_set_style_bg_color(row->row, lv_color_hex(bg_color), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(row->row, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(row->row, lv_color_hex(next.bg_color), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(row->row, row->available ? LV_OPA_COVER : LV_OPA_50, LV_PART_MAIN);
     lv_obj_set_style_border_width(row->row, 0, LV_PART_MAIN);
-    const bool clickable = row->available && !row->pending &&
-      (!row->selected || row->entity_id != ctx->entity_id);
-    if (clickable) lv_obj_add_flag(row->row, LV_OBJ_FLAG_CLICKABLE);
+    if (next.clickable) lv_obj_add_flag(row->row, LV_OBJ_FLAG_CLICKABLE);
     else lv_obj_clear_flag(row->row, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_style_opa(row->row, row->available ? LV_OPA_COVER : LV_OPA_50, LV_PART_MAIN);
-    if (media_control_modal_ui().active == ctx) {
-      ControlModalLayout layout = control_modal_calc_layout(ctx->width_compensation_percent);
-      const lv_coord_t height = media_control_speaker_row_height(ctx, row, layout.short_side);
-      if (lv_obj_get_height(row->row) != height) lv_obj_set_height(row->row, height);
+    if (next.height >= 0 && lv_obj_get_height(row->row) != next.height) {
+      lv_obj_set_height(row->row, next.height);
     }
   }
   if (row->name_label) {
-    std::string name = row->friendly_name.empty()
-      ? media_control_speaker_fallback_name(row->entity_id) : row->friendly_name;
-    lv_label_set_display_text(row->name_label, name.c_str());
-    lv_obj_set_style_text_color(row->name_label, lv_color_hex(text_color), LV_PART_MAIN);
+    lv_label_set_display_text(row->name_label, next.name.c_str());
+    lv_obj_set_style_text_color(row->name_label, lv_color_hex(next.text_color), LV_PART_MAIN);
+    lv_obj_set_style_text_opa(row->name_label, text_opa, LV_PART_MAIN);
 #ifdef ESPCONTROL_LOW_HEAP_MEDIA_CONTROL
     lv_obj_set_style_translate_y(
       row->name_label,
@@ -3709,7 +3760,8 @@ inline void media_control_refresh_speaker_row(MediaControlCtx *ctx,
       row->speaker_icon,
       find_icon(row->selected ? "Speaker Wireless" : "Speaker Off"));
     lv_obj_clear_flag(row->speaker_icon, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_set_style_text_color(row->speaker_icon, lv_color_hex(text_color), LV_PART_MAIN);
+    lv_obj_set_style_text_color(row->speaker_icon, lv_color_hex(next.text_color), LV_PART_MAIN);
+    lv_obj_set_style_text_opa(row->speaker_icon, text_opa, LV_PART_MAIN);
   }
   if (row->volume_controls) {
     if (show_volume) lv_obj_clear_flag(row->volume_controls, LV_OBJ_FLAG_HIDDEN);
@@ -3727,22 +3779,17 @@ inline void media_control_refresh_speaker_row(MediaControlCtx *ctx,
     else lv_obj_add_flag(row->volume_plus_btn, LV_OBJ_FLAG_HIDDEN);
   }
 #endif
-  const bool volume_enabled = show_volume && row->available && row->volume_known;
-  media_volume_set_button_enabled(row->volume_minus_btn, volume_enabled && row->volume_pct > 0);
-  media_volume_set_button_enabled(
-    row->volume_plus_btn,
-    volume_enabled && row->volume_pct < media_control_volume_max_pct(ctx));
+  media_volume_set_button_enabled(row->volume_minus_btn, next.minus_enabled);
+  media_volume_set_button_enabled(row->volume_plus_btn, next.plus_enabled);
   if (row->volume_label) {
     if (show_volume) lv_obj_clear_flag(row->volume_label, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_add_flag(row->volume_label, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_set_style_text_color(row->volume_label, lv_color_hex(text_color), LV_PART_MAIN);
+    lv_obj_set_style_text_color(row->volume_label, lv_color_hex(next.text_color), LV_PART_MAIN);
     lv_obj_set_style_text_opa(
-      row->volume_label, MEDIA_CONTROL_SPEAKER_VOLUME_TEXT_OPA, LV_PART_MAIN);
-    char value[8];
-    if (row->volume_known) snprintf(value, sizeof(value), "%d%%", row->volume_pct);
-    else std::strncpy(value, "--", sizeof(value));
-    value[sizeof(value) - 1] = '\0';
-    lv_label_set_display_text(row->volume_label, value);
+      row->volume_label,
+      row->available ? MEDIA_CONTROL_SPEAKER_VOLUME_TEXT_OPA : MEDIA_CONTROL_SPEAKER_VOLUME_TEXT_OPA / 2,
+      LV_PART_MAIN);
+    lv_label_set_display_text(row->volume_label, next.volume.c_str());
 #ifdef ESPCONTROL_LOW_HEAP_MEDIA_CONTROL
     lv_obj_set_style_translate_y(
       row->volume_label, lv_obj_get_height(row->volume_label) / 2, LV_PART_MAIN);

@@ -32,6 +32,7 @@ using lv_style_selector_t = int;
 constexpr int LV_PART_MAIN = 0, LV_STATE_DEFAULT = 0, LV_STATE_CHECKED = 1, LV_STATE_PRESSED = 2;
 constexpr int LV_EVENT_ALL = 0, LV_EVENT_PRESSED = 3, LV_EVENT_RELEASED = 4, LV_EVENT_PRESS_LOST = 5;
 constexpr int LV_OPA_COVER = 255, LV_OPA_TRANSP = 0;
+using lv_opa_t = int;
 struct lv_event_t { lv_obj_t *target; int code; void *user_data = nullptr; void *param = nullptr; };
 struct lv_area_t { int x1 = 0, y1 = 0, x2 = 39, y2 = 39; };
 using lv_event_cb_t = void (*)(lv_event_t *);
@@ -124,7 +125,9 @@ struct MediaControlCtx {
   int width_compensation_percent = 100;
   bool selected = true;
 };
+/*MEDIA_SPEAKER_ROW_VISUAL*/
 struct MediaSpeakerRowState {
+  MediaSpeakerRowVisual visual;
   std::string entity_id = "media_player.speaker", friendly_name = "Speaker";
   bool selected = false, pending = false, available = true, volume_known = true;
   int volume_pct = 50;
@@ -189,6 +192,10 @@ groups = (
     ("button_grid_fan.h", "", ("fan_control_style_binary_button",)),
     ("button_grid_climate.h", "", ("climate_style_range_target_button",)),
 )
+# The speaker row caches what it last drew in this production struct.
+source = source.replace("/*MEDIA_SPEAKER_ROW_VISUAL*/", re.search(
+    r"^struct MediaSpeakerRowVisual \{.*?^\};", (headers / "button_grid_media.h").read_text(),
+    re.S | re.M).group(0))
 for filename, namespace, names in groups:
     text = (headers / filename).read_text()
     if namespace:
