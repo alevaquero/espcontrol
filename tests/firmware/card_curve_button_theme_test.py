@@ -20,6 +20,7 @@ BUTTON_RADII = {
     "guition-esp32-p4-jc8012p4a1-v2": 11,
     "guition-esp32-p4-jc8012p4a1-v3": 11,
     "esp32-p4-86": 12,
+    "esp32-p4-wifi6-touch-lcd-5": 11,
     "guition-esp32-s3-4848s040": 8,
 }
 parser = argparse.ArgumentParser(description=__doc__)
@@ -44,4 +45,4 @@ for slug, profile in profiles.items():
 s3 = profiles["guition-esp32-s3-4848s040"]
 assert web_config(s3)["cardRadiusPixels"] == 26
 assert web_config(s3)["cardCurveRadii"] == {"Small": 16, "Medium": 21}
-print("Ordinary button radii stay independent of card curves on all nine profiles.")
+print("Ordinary button radii stay independent of card curves on all ten profiles.")

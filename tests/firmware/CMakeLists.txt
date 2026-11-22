@@ -10,6 +10,12 @@ target_compile_features(dpi_timing_test PRIVATE cxx_std_17)
 target_compile_options(dpi_timing_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
 target_include_directories(dpi_timing_test PRIVATE ../../components/mipi_dsi)
 add_test(NAME dpi_timing_test COMMAND dpi_timing_test)
+
+add_executable(dsi_rotation_test dsi_rotation_test.cpp)
+target_compile_features(dsi_rotation_test PRIVATE cxx_std_17)
+target_compile_options(dsi_rotation_test PRIVATE -Wall -Wextra -Werror -UNDEBUG)
+target_include_directories(dsi_rotation_test PRIVATE ../../components/mipi_dsi)
+add_test(NAME dsi_rotation_test COMMAND dsi_rotation_test)
 add_test(NAME p4_pipeline_runtime_test COMMAND
   ${CMAKE_COMMAND} -E env "CXX=${CMAKE_CXX_COMPILER}"
   ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/p4_pipeline_runtime_test.py)
