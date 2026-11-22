@@ -185,6 +185,8 @@ export function createConfigImageOptionsFeature(dependencies: ConfigImageOptions
             } else if (mode === "activity" && (draft || validImageRefreshTrigger(trigger))) {
                 out = setConfigOptionValue(out, "image_modal_refresh_mode", mode);
                 out = setConfigOptionValue(out, "image_modal_refresh_trigger", trigger);
+                if (configOptionEnabled(options, "image_modal_activity_open"))
+                    out = setConfigOption(out, "image_modal_activity_open", true);
             }
         }
         return preserveCardColorOptions(options, out);

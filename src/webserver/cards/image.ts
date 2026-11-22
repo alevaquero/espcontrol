@@ -1,4 +1,4 @@
-import { configOptionValue, setConfigOptionValue } from "../model/config_primitives";
+import { configOptionEnabled, configOptionValue, setConfigOption, setConfigOptionValue } from "../model/config_primitives";
 import {
     cardContractAllowInSubpage,
     cardContractCard,
@@ -109,12 +109,15 @@ export function registerImageCardTypes(
         const trigger = helpers.entityField("Trigger entity", helpers.idPrefix + "image-refresh-trigger",
             configOptionValue(b.options, "image_modal_refresh_trigger"),
             "e.g. binary_sensor.front_door_motion", ["binary_sensor", "event"]);
+        const openToggle = helpers.toggleRow("Open on activity", helpers.idPrefix + "image-activity-open",
+            configOptionEnabled(b.options, "image_modal_activity_open"));
         const help = document.createElement("p");
         help.className = "sp-setting-note";
-        help.textContent = "Periodic refresh updates the visible card and expanded image at the selected interval. On activity refreshes them every 5 seconds for 30 seconds. New activity restarts this period. Refreshing stops when the card is hidden. The return-home timeout still applies.";
+        help.textContent = "Periodic refresh updates the visible card and expanded image at the selected interval. On activity refreshes them every 5 seconds for 30 seconds. New activity restarts this period. Open on activity also expands the image when activity starts, if the card is on screen and no other popup is open. Refreshing stops when the card is hidden. The return-home timeout still applies.";
         panel.appendChild(refresh.field);
         panel.appendChild(interval.field);
         panel.appendChild(trigger.field);
+        panel.appendChild(openToggle.row);
         panel.appendChild(help);
         helpers.requireField(trigger.input, "Choose a binary sensor or event entity for activity refresh.",
             () => isCamera() && refresh.select.value === "activity", (value: string) => validImageRefreshTrigger(value.trim()));
@@ -122,13 +125,15 @@ export function registerImageCardTypes(
             refreshPanel.hidden = !isCamera();
             refresh.field.hidden = !isCamera();
             interval.field.hidden = !isCamera() || refresh.select.value !== "periodic";
-            trigger.field.hidden = help.hidden = !isCamera() || refresh.select.value !== "activity";
+            trigger.field.hidden = help.hidden = openToggle.row.hidden =
+                !isCamera() || refresh.select.value !== "activity";
         }
         function syncRefreshSettings() {
             syncVisibility();
             let options = setConfigOptionValue(b.options, "image_modal_refresh_mode", refresh.select.value);
             options = setConfigOptionValue(options, "image_modal_refresh_interval", interval.select.value);
             options = setConfigOptionValue(options, "image_modal_refresh_trigger", trigger.input.value.trim());
+            options = setConfigOption(options, "image_modal_activity_open", openToggle.input.checked);
             b.options = normalizeImageOptions(options, b.entity, true);
             helpers.saveField("options", b.options);
         }
@@ -136,6 +141,7 @@ export function registerImageCardTypes(
         interval.select.addEventListener("change", syncRefreshSettings);
         trigger.input.addEventListener("input", syncRefreshSettings);
         trigger.input.addEventListener("change", syncRefreshSettings);
+        openToggle.input.addEventListener("change", syncRefreshSettings);
         entityInput.addEventListener("input", syncRefreshSettings);
         entityInput.addEventListener("change", syncRefreshSettings);
         syncVisibility();

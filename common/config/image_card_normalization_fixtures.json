@@ -150,6 +150,36 @@
     }
   },
   {
+    "name": "activity opens popup",
+    "input": "camera.front_door;;Auto;Auto;;;image;;image_modal_activity_open,image_modal_refresh_mode=activity,image_modal_refresh_trigger=event.doorbell",
+    "expected": {
+      "entity": "camera.front_door",
+      "label": "",
+      "icon": "Auto",
+      "icon_on": "Auto",
+      "sensor": "",
+      "unit": "",
+      "type": "image",
+      "precision": "",
+      "options": "image_modal_refresh_mode=activity,image_modal_refresh_trigger=event.doorbell,image_modal_activity_open"
+    }
+  },
+  {
+    "name": "open on activity dropped without activity",
+    "input": "camera.front_door;;Auto;Auto;;;image;;image_modal_refresh_mode=periodic,image_modal_activity_open",
+    "expected": {
+      "entity": "camera.front_door",
+      "label": "",
+      "icon": "Auto",
+      "icon_on": "Auto",
+      "sensor": "",
+      "unit": "",
+      "type": "image",
+      "precision": "",
+      "options": "image_modal_refresh_mode=periodic"
+    }
+  },
+  {
     "name": "invalid activity disabled",
     "input": "camera.front_door;;Auto;Auto;;;image;;image_modal_refresh_mode=activity,image_modal_refresh_trigger=camera.other",
     "expected": {

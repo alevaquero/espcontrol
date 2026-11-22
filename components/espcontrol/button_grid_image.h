@@ -93,6 +93,7 @@ struct ImageCardCtx {
   espcontrol::camera::ActivityTrigger activity_trigger;
   espcontrol::camera::ImageRevision revision;
   std::string refresh_trigger_entity;
+  bool open_on_activity = false;  // Open the expanded view when the trigger fires.
   bool explicit_picture_refresh = false;
   uint32_t revision_retry_ms = 0;
   bool media_artwork = false;
@@ -1149,6 +1150,7 @@ inline void reset_image_card_pool(const GridConfig &cfg) {
     contexts[i].scheduled_tile_request = false;
     contexts[i].activity_trigger = {};
     contexts[i].refresh_trigger_entity.clear();
+    contexts[i].open_on_activity = false;
     contexts[i].revision = {};
     contexts[i].explicit_picture_refresh = false;
     contexts[i].revision_retry_ms = 0;
@@ -3222,6 +3224,9 @@ inline void image_card_handle_activity_state(ImageCardCtx *ctx, const std::strin
   if (!activated || !image_card_context_on_active_screen(ctx)) return;
   if (!ctx->refresh_schedule.open) image_card_begin_refresh_schedule(ctx);
   ctx->refresh_schedule.activate(esphome::millis());
+  // Only a visible card with no other popup open gets here, so this never
+  // covers something the user is using.
+  if (ctx->open_on_activity && !image_card_modal_active_for(ctx)) image_card_open_modal(ctx);
 }
 
 inline void image_card_refresh_theme(uint32_t fit_background_color) {
@@ -3304,6 +3309,7 @@ inline bool image_card_bind_runtime(BtnSlot &s, const ParsedCfg &p,
   ctx->scheduled_tile_request = false;
   ctx->activity_trigger = {};
   ctx->refresh_trigger_entity.clear();
+  ctx->open_on_activity = false;
   if (p.entity.rfind("camera.", 0) == 0) {
     ctx->refresh_schedule.mode = espcontrol::camera::refresh_mode(
         cfg_option_value(p.options, "image_modal_refresh_mode"));
@@ -3314,6 +3320,9 @@ inline bool image_card_bind_runtime(BtnSlot &s, const ParsedCfg &p,
         !espcontrol::camera::valid_trigger(ctx->refresh_trigger_entity)) {
       ctx->refresh_schedule.mode = espcontrol::camera::RefreshMode::OFF;
     }
+    ctx->open_on_activity =
+        ctx->refresh_schedule.mode == espcontrol::camera::RefreshMode::ACTIVITY &&
+        cfg_option_token_present(p.options, IMAGE_MODAL_ACTIVITY_OPEN_OPTION);
   }
   ctx->media_artwork = false;
   ctx->media_artwork_suppressed = false;

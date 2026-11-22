@@ -63,6 +63,7 @@ struct ImageCardCtx {
   espcontrol::camera::RefreshSchedule refresh_schedule;
   espcontrol::camera::ActivityTrigger activity_trigger;
   espcontrol::camera::ImageRevision revision;
+  bool open_on_activity = false;
 };
 struct ModalUi { void *request_timer = nullptr; };
 ModalUi modal_ui;
@@ -107,6 +108,8 @@ struct HaCoordinator { uint32_t connection_generation() const { return 1; } };
 HaCoordinator &ha_read_coordinator() { static HaCoordinator value; return value; }
 bool image_card_context_current(ImageCardCtx *, const std::string &, uint32_t) { return true; }
 bool image_card_modal_active_for(ImageCardCtx *ctx) { return ctx->modal; }
+int modal_opens = 0;
+void image_card_open_modal(ImageCardCtx *ctx) { ++modal_opens; ctx->modal = true; }
 bool image_card_context_on_active_screen(ImageCardCtx *ctx) { return ctx->visible && (!image_card_page_visible() || image_card_page_visible()()); }
 bool image_card_context_visible_on_active_screen(ImageCardCtx *ctx) { return image_card_context_on_active_screen(ctx); }
 bool image_card_has_separate_modal_image(ImageCardCtx *) { return true; }
@@ -361,6 +364,24 @@ int main() {
   image_card_handle_activity_state(&ctx, "on", true, 1);
   image_card_refresh_due([] { return true; });
   assert(tile_requests == 1 && !ctx.refresh_schedule.window);
+
+  // Open on activity expands a visible card once, and never a hidden one.
+  reset();
+  ctx.entity_id = "camera.test";
+  ctx.refresh_schedule.mode = espcontrol::camera::RefreshMode::ACTIVITY;
+  ctx.open_on_activity = true;
+  const int opens_before = modal_opens;
+  ctx.visible = false;
+  image_card_handle_activity_state(&ctx, "off", true, 1);
+  image_card_handle_activity_state(&ctx, "on", true, 1);
+  assert(modal_opens == opens_before && !ctx.modal);
+  ctx.visible = true;
+  image_card_handle_activity_state(&ctx, "off", true, 1);
+  image_card_handle_activity_state(&ctx, "on", true, 1);
+  assert(modal_opens == opens_before + 1 && ctx.modal);
+  image_card_handle_activity_state(&ctx, "off", true, 1);
+  image_card_handle_activity_state(&ctx, "on", true, 1);
+  assert(modal_opens == opens_before + 1); // Already open: only the refresh restarts.
 
   // Hiding one tile must not cancel the shared modal belonging to another card.
   reset();

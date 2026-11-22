@@ -88,6 +88,8 @@ For a `camera.*` entity, open **Refresh Settings > Camera refresh**:
 
 For **On activity**, select a **Trigger entity** such as `binary_sensor.front_door_motion` or `event.front_door_doorbell`. Binary sensors trigger when they change from off to on. Event entities trigger when a new event occurs; every event type on the selected entity counts. Opening while a binary sensor is already on starts one window. Remaining on does not extend it indefinitely.
 
+Turn on **Open on activity** to expand the camera image automatically when activity starts, so you do not have to tap the card. It opens only while the card is on screen and no other popup is open; it never covers a popup you are using. Close it with **<** as usual; the return-home timeout still applies.
+
 Periodic and activity refresh run while the camera card is visible on the main page or a subpage. Opening the expanded view continues the same refresh schedule. On activity refreshes for 30 seconds; new activity restarts that window. Leaving the page, covering the card with another modal, or entering the screensaver stops refreshes. Events received while hidden do not queue refreshes for later.
 
 Refreshes do not open the camera, wake the screen, or extend **Home Screen Timeout**. Old doorbell events are not replayed after reconnecting.
