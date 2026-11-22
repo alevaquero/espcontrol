@@ -4050,6 +4050,20 @@ export const CARD_CONTRACT_CARDS: Readonly<Record<string, CardTypeSpec>> = {
         "omitDefault": true
       },
       {
+        "name": "image_modal_activity_interval",
+        "label": "Activity refresh interval",
+        "kind": "choice",
+        "values": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+        ],
+        "defaultValue": "5",
+        "omitDefault": true
+      },
+      {
         "name": "image_modal_activity_open",
         "label": "Open on activity",
         "kind": "flag",
@@ -4099,6 +4113,7 @@ export const CARD_CONTRACT_CARDS: Readonly<Record<string, CardTypeSpec>> = {
         "image_modal_refresh_mode",
         "image_modal_refresh_interval",
         "image_modal_refresh_trigger",
+        "image_modal_activity_interval",
         "image_modal_activity_open"
       ],
       "optionHook": "normalize_image_options"
@@ -5260,6 +5275,7 @@ export const CARD_CONTRACT_OPTION_NAMES: Readonly<Record<string, string>> = {
   "icon_on2": "icon_on2",
   "image_icon": "image_icon",
   "image_label": "image_label",
+  "image_modal_activity_interval": "image_modal_activity_interval",
   "image_modal_activity_open": "image_modal_activity_open",
   "image_modal_mode": "image_modal_mode",
   "image_modal_refresh_interval": "image_modal_refresh_interval",

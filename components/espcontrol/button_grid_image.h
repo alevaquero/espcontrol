@@ -3315,6 +3315,8 @@ inline bool image_card_bind_runtime(BtnSlot &s, const ParsedCfg &p,
         cfg_option_value(p.options, "image_modal_refresh_mode"));
     ctx->refresh_schedule.interval_ms = espcontrol::camera::refresh_interval_ms(
         cfg_option_value(p.options, "image_modal_refresh_interval"));
+    ctx->refresh_schedule.activity_interval_ms = espcontrol::camera::activity_interval_ms(
+        cfg_option_value(p.options, IMAGE_MODAL_ACTIVITY_INTERVAL_OPTION));
     ctx->refresh_trigger_entity = cfg_option_value(p.options, "image_modal_refresh_trigger");
     if (ctx->refresh_schedule.mode == espcontrol::camera::RefreshMode::ACTIVITY &&
         !espcontrol::camera::valid_trigger(ctx->refresh_trigger_entity)) {

@@ -43,6 +43,7 @@ constexpr const char *SENSOR_STATE_HIGH_LABEL_OPTION = card_runtime_option_name_
 constexpr const char *SENSOR_TIME_UNIT_OPTION = card_runtime_option_name_time_unit();
 constexpr const char *IMAGE_LABEL_OPTION = card_runtime_option_name_image_label();
 constexpr const char *IMAGE_MODAL_ACTIVITY_OPEN_OPTION = "image_modal_activity_open";
+constexpr const char *IMAGE_MODAL_ACTIVITY_INTERVAL_OPTION = "image_modal_activity_interval";
 constexpr const char *IMAGE_ICON_OPTION = card_runtime_option_name_image_icon();
 constexpr const char *IMAGE_MODAL_MODE_OPTION = card_runtime_option_name_image_modal_mode();
 constexpr const char *MEDIA_COVER_ART_OPTION = card_runtime_option_name_media_cover_art();
@@ -586,6 +587,10 @@ inline std::string image_card_options_normalized(const std::string &options,
     } else if (mode == espcontrol::camera::RefreshMode::ACTIVITY && espcontrol::camera::valid_trigger(trigger)) {
       append("image_modal_refresh_mode", "activity");
       append("image_modal_refresh_trigger", trigger);
+      const uint32_t activity_interval = espcontrol::camera::activity_interval_ms(
+          cfg_option_value(options, IMAGE_MODAL_ACTIVITY_INTERVAL_OPTION));
+      if (activity_interval != 5000)
+        append(IMAGE_MODAL_ACTIVITY_INTERVAL_OPTION, std::to_string(activity_interval / 1000));
       if (cfg_option_token_present(options, IMAGE_MODAL_ACTIVITY_OPEN_OPTION)) {
         out += ",";
         out += IMAGE_MODAL_ACTIVITY_OPEN_OPTION;
