@@ -230,9 +230,10 @@ inline RemoteModalPlacement remote_modal_place(
   const lv_coord_t total_h = beside ? std::max(cluster_h, row_h) : cluster_h + between + row_h;
   placement.left = content_left + (content_w - total_w) / 2;
   placement.top = std::max<lv_coord_t>(content_top, content_top + (content_h - total_h) / 2);
-  placement.cluster_x = beside ? placement.left : placement.left + (total_w - cluster_w) / 2;
+  // Side by side, the button row is on the left and the wheel and volume bar on the right.
+  placement.cluster_x = beside ? placement.left + row_w + between : placement.left + (total_w - cluster_w) / 2;
   placement.cluster_y = beside ? placement.top + (total_h - cluster_h) / 2 : placement.top;
-  placement.row_x = beside ? placement.left + cluster_w + between : placement.left + (total_w - row_w) / 2;
+  placement.row_x = beside ? placement.left : placement.left + (total_w - row_w) / 2;
   placement.row_y = beside ? placement.top + (total_h - row_h) / 2 : placement.top + cluster_h + between;
   return placement;
 }
@@ -301,13 +302,15 @@ inline void remote_layout_modal(const ControlModalLayout &layout) {
   if (ui.wheel) {
     lv_obj_set_size(ui.wheel, placement.pad_w, placement.pad_w);
     lv_obj_set_style_radius(ui.wheel, LV_RADIUS_CIRCLE, LV_PART_MAIN);
-    lv_obj_set_pos(ui.wheel, placement.cluster_x + (has_volume ? k + placement.cluster_gap : 0),
-                   placement.cluster_y);
+    lv_obj_set_pos(ui.wheel, placement.cluster_x, placement.cluster_y);
   }
   if (ui.volume_bar) {
     lv_obj_set_size(ui.volume_bar, k, k * 3 + g * 2);
     lv_obj_set_style_radius(ui.volume_bar, k / 2, LV_PART_MAIN);
-    lv_obj_set_pos(ui.volume_bar, placement.cluster_x, placement.cluster_y);
+    // The volume bar sits to the right of the wheel.
+    lv_obj_set_pos(ui.volume_bar,
+                   placement.cluster_x + (has_pad ? placement.pad_w + placement.cluster_gap : 0),
+                   placement.cluster_y);
   }
   if (ui.back_btn) lv_obj_move_foreground(ui.back_btn);
 }

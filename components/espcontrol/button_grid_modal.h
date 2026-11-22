@@ -11,6 +11,8 @@ constexpr lv_coord_t CONTROL_MODAL_REFERENCE_SIDE_PX = DISPLAY_MODAL_REFERENCE_S
 constexpr lv_coord_t CONTROL_MODAL_ARC_STROKE_REF_PX = DISPLAY_MODAL_ARC_STROKE_REF_PX;
 constexpr lv_coord_t CONTROL_MODAL_BACK_BUTTON_REF_PX = DISPLAY_MODAL_BACK_BUTTON_REF_PX;
 constexpr lv_coord_t CONTROL_MODAL_BUTTON_REF_PX = DISPLAY_MODAL_BUTTON_REF_PX;
+// The chevron glyph fills only about half of the icon font's height.
+constexpr uint16_t CONTROL_MODAL_BACK_ICON_ZOOM = 358;
 constexpr lv_coord_t CONTROL_MODAL_INSET_REF_PX = DISPLAY_MODAL_INSET_REF_PX;
 constexpr lv_coord_t CONTROL_MODAL_CONTROLS_GAP_REF_PX = DISPLAY_MODAL_CONTROLS_GAP_REF_PX;
 constexpr lv_coord_t CONTROL_MODAL_CONTROLS_DOWN_REF_PX = DISPLAY_MODAL_CONTROLS_DOWN_REF_PX;
@@ -57,6 +59,8 @@ inline ControlModalDefinition control_modal_definition(ControlModalKind kind) {
       return {ControlModalPresentation::LIST, ControlModalChrome::CLOSE,
               ControlModalDismissPolicy::DISMISS};
     case ControlModalKind::WEATHER_FORECAST:
+      return {ControlModalPresentation::STATUS, ControlModalChrome::BACK,
+              ControlModalDismissPolicy::DISMISS};
     case ControlModalKind::NETWORK_STATUS:
       return {ControlModalPresentation::STATUS, ControlModalChrome::CLOSE,
               ControlModalDismissPolicy::DISMISS};
@@ -1028,6 +1032,11 @@ inline ControlModalShell control_modal_open_shell(ControlModalKind kind,
       return shell;
     }
     control_modal_style_chrome_button(shell.close_btn, shell.layout, button_top_right);
+    lv_obj_t *icon = button_top_right ? nullptr : lv_obj_get_child(shell.close_btn, 0);
+    if (icon) {
+      lv_obj_set_style_transform_zoom(icon, CONTROL_MODAL_BACK_ICON_ZOOM, LV_PART_MAIN);
+      control_modal_center_tab_icon(icon);
+    }
     lv_obj_add_event_cb(shell.close_btn, [](lv_event_t *) {
       control_modal_force_close_active();
     }, LV_EVENT_CLICKED, nullptr);
