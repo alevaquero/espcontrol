@@ -3404,6 +3404,23 @@
           ]
         },
         {
+          "name": "media_controls_combined",
+          "label": "Volume and Position on Controls",
+          "kind": "flag",
+          "omitDefault": true,
+          "applicability": [
+            {
+              "source": "field",
+              "name": "sensor",
+              "operator": "in",
+              "value": [
+                "control_modal",
+                "cover_art"
+              ]
+            }
+          ]
+        },
+        {
           "name": "label_display",
           "label": "Label Display",
           "kind": "choice",
@@ -3549,6 +3566,7 @@
           "speaker_group_entity",
           "power_entity",
           "media_tabs",
+          "media_controls_combined",
           "volume_max",
           "playlist_content_id",
           "playlist_content_type",

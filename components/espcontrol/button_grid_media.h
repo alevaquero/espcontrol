@@ -10,6 +10,8 @@
 #include "media_library.h"
 
 constexpr lv_coord_t MEDIA_CONTROL_VOLUME_VALUE_Y_REF_PX = -8;
+// Percent per tap on the Controls tab volume pill.
+constexpr int MEDIA_CONTROL_COMBINED_VOLUME_STEP = 5;
 constexpr int MEDIA_CONTROL_SPEAKERS_TAB_ICON_SCALE_PERCENT = 80;
 constexpr int MEDIA_CONTROL_SPEAKER_ROW_ICON_ZOOM = 200;
 constexpr lv_opa_t MEDIA_CONTROL_SPEAKER_VOLUME_TEXT_OPA = 204;
@@ -18,6 +20,7 @@ struct MediaControlCtx {
   std::string entity_id;
   std::string power_entity;
   espcontrol::media::ControlTabs control_tabs = espcontrol::media::parse_control_tabs("");
+  bool combined_controls = false;  // Volume and track position on the Controls tab.
   std::string power_state_text = "unknown";
   bool power_state_known = false;
   bool power_available = false;
@@ -163,6 +166,11 @@ struct MediaControlModalUi {
   lv_obj_t *next_btn = nullptr;
   lv_obj_t *repeat_btn = nullptr;
   lv_obj_t *repeat_icon_lbl = nullptr;
+  // Optional thin track bar and volume pill on the Controls tab.
+  lv_obj_t *controls_progress_slider = nullptr;
+  lv_obj_t *controls_elapsed_lbl = nullptr;
+  lv_obj_t *controls_remaining_lbl = nullptr;
+  lv_obj_t *controls_volume_bar = nullptr;
   lv_obj_t *volume_arc = nullptr;
   lv_obj_t *volume_group_lbl = nullptr;
   lv_obj_t *volume_pct_lbl = nullptr;
@@ -413,6 +421,7 @@ inline void media_control_speaker_action_timer_cb(lv_timer_t *timer);
 inline void media_control_refresh_power(MediaControlCtx *ctx);
 inline void media_control_refresh_playback_modes(MediaControlCtx *ctx);
 inline void media_control_ensure_tab_content(MediaControlCtx *ctx);
+inline void media_control_create_controls_extras(MediaControlCtx *ctx);
 inline void media_control_clear_tab_content();
 inline void media_control_select_tab(MediaControlTab tab);
 inline void media_control_create_library_tab_content(MediaControlCtx *ctx);
@@ -2933,6 +2942,41 @@ inline void media_control_update_progress_handle(lv_obj_t *slider, lv_obj_t *han
   lv_obj_move_foreground(handle);
 }
 
+inline void media_control_set_controls_time_labels(MediaControlCtx *ctx, float seconds) {
+  MediaControlModalUi &ui = media_control_modal_ui();
+  if (!ctx) return;
+  char buf[16];
+  if (ui.controls_elapsed_lbl) {
+    media_format_time(seconds, buf, sizeof(buf));
+    lv_label_set_display_text(ui.controls_elapsed_lbl, buf);
+  }
+  if (ui.controls_remaining_lbl) {
+    const float left = ctx->duration > seconds ? ctx->duration - seconds : 0.0f;
+    buf[0] = '-';
+    media_format_time(left, buf + 1, sizeof(buf) - 1);
+    lv_label_set_display_text(ui.controls_remaining_lbl, buf);
+  }
+}
+
+// Players without a track length (radio streams) hide the bar and its times.
+inline void media_control_refresh_controls_progress(MediaControlCtx *ctx, float seconds, int pct) {
+  MediaControlModalUi &ui = media_control_modal_ui();
+  if (!ctx || ui.active != ctx || !ui.controls_progress_slider) return;
+  const bool has_duration = ctx->available && ctx->duration > 0.0f;
+  lv_obj_t *parts[3] = {
+    ui.controls_progress_slider, ui.controls_elapsed_lbl, ui.controls_remaining_lbl};
+  for (lv_obj_t *part : parts) {
+    if (!part) continue;
+    if (has_duration) lv_obj_clear_flag(part, LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_add_flag(part, LV_OBJ_FLAG_HIDDEN);
+  }
+  if (!has_duration || ctx->dragging_progress) return;
+  ui.updating_progress = true;
+  lv_slider_set_value(ui.controls_progress_slider, pct, LV_ANIM_OFF);
+  ui.updating_progress = false;
+  media_control_set_controls_time_labels(ctx, seconds);
+}
+
 inline void media_control_refresh_progress(MediaControlCtx *ctx) {
   MediaControlModalUi &ui = media_control_modal_ui();
   if (!ctx || ui.active != ctx) return;
@@ -2942,6 +2986,7 @@ inline void media_control_refresh_progress(MediaControlCtx *ctx) {
     pct = (int)((seconds * 100.0f / ctx->duration) + 0.5f);
   }
   pct = media_clamp_percent(pct);
+  media_control_refresh_controls_progress(ctx, seconds, pct);
   if (!ui.progress_slider) return;
   if (!ui.progress_layout_ready) {
     ui.progress_refresh_pending = true;
@@ -3426,6 +3471,152 @@ inline void media_control_create_controls_tab_content(MediaControlCtx *ctx) {
     if (next == espcontrol::media::RepeatMode::UNKNOWN) return;
     send_media_repeat_action(ui.active->entity_id, next);
   }, LV_EVENT_CLICKED, nullptr);
+  if (ctx->combined_controls) media_control_create_controls_extras(ctx);
+}
+
+inline void media_control_seek_to_slider(lv_obj_t *slider) {
+  MediaControlModalUi &ui = media_control_modal_ui();
+  if (!ui.active || !slider) return;
+  ui.active->dragging_progress = false;
+  if (!ui.active->available || ui.active->duration <= 0.0f) return;
+  int value = lv_slider_get_value(slider);
+  ui.active->seek_pending = true;
+  ui.active->seek_target_seconds = ui.active->duration * value / 100.0f;
+  ui.active->seek_pending_ms = esphome::millis();
+  ui.active->position_seconds = ui.active->seek_target_seconds;
+  ui.active->position_updated_ms = ui.active->seek_pending_ms;
+  media_control_refresh_progress(ui.active);
+  send_media_seek_action(ui.active->entity_id, value, ui.active->duration);
+}
+
+inline lv_obj_t *media_control_create_controls_time_label(lv_obj_t *parent, MediaControlCtx *ctx,
+                                                          lv_text_align_t align) {
+  lv_obj_t *label = lv_label_create(parent);
+  if (!label) return nullptr;
+  lv_label_set_display_text(label, "0:00");
+  lv_obj_set_style_text_color(label, lv_color_hex(current_theme().text_muted), LV_PART_MAIN);
+  lv_obj_set_style_text_align(label, align, LV_PART_MAIN);
+  if (ctx->label_font) lv_obj_set_style_text_font(label, ctx->label_font, LV_PART_MAIN);
+  lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
+  apply_text_width_compensation(label);
+  lv_obj_add_flag(label, LV_OBJ_FLAG_HIDDEN);
+  return label;
+}
+
+// A transparent + or - key inside the volume pill; pressing tints just that key.
+inline lv_obj_t *media_control_create_volume_bar_key(lv_obj_t *bar, MediaControlCtx *ctx,
+                                                     const char *icon, int step) {
+  lv_obj_t *btn = lv_btn_create(bar);
+  if (!btn) return nullptr;
+  lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, LV_PART_MAIN);
+  lv_obj_set_style_border_width(btn, 0, LV_PART_MAIN);
+  lv_obj_set_style_shadow_width(btn, 0, LV_PART_MAIN);
+  lv_obj_set_style_pad_all(btn, 0, LV_PART_MAIN);
+  const lv_style_selector_t pressed =
+    static_cast<lv_style_selector_t>(LV_PART_MAIN) | static_cast<lv_style_selector_t>(LV_STATE_PRESSED);
+  lv_obj_set_style_bg_color(btn, lv_color_hex(ctx->accent_color), pressed);
+  lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, pressed);
+  const lv_style_selector_t disabled =
+    static_cast<lv_style_selector_t>(LV_PART_MAIN) | static_cast<lv_style_selector_t>(LV_STATE_DISABLED);
+  lv_obj_set_style_opa(btn, LV_OPA_40, disabled);
+  apply_push_button_transition(btn);
+  lv_obj_clear_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_t *label = lv_label_create(btn);
+  if (label) {
+    lv_label_set_display_text(label, icon);
+    lv_obj_set_style_text_color(label, lv_color_hex(current_theme().text_primary), LV_PART_MAIN);
+    if (ctx->icon_font) lv_obj_set_style_text_font(label, ctx->icon_font, LV_PART_MAIN);
+    lv_obj_center(label);
+  }
+  lv_obj_set_user_data(btn, reinterpret_cast<void *>(static_cast<intptr_t>(step)));
+  lv_obj_add_event_cb(btn, [](lv_event_t *e) {
+    MediaControlModalUi &ui = media_control_modal_ui();
+    if (!ui.active) return;
+    lv_obj_t *key = static_cast<lv_obj_t *>(lv_event_get_target(e));
+    const int step = static_cast<int>(reinterpret_cast<intptr_t>(lv_obj_get_user_data(key)));
+    int pct = ui.active->current_pct;
+    media_control_group_volume_percent(ui.active, &pct);
+    media_control_apply_volume_percent(ui.active, pct + step, true, true);
+  }, LV_EVENT_CLICKED, nullptr);
+  return btn;
+}
+
+inline void media_control_create_controls_extras(MediaControlCtx *ctx) {
+  MediaControlModalUi &ui = media_control_modal_ui();
+  if (!ctx || !ui.content_box) return;
+  if (media_control_progress_supported(ctx)) {
+    ui.controls_elapsed_lbl = media_control_create_controls_time_label(
+      ui.content_box, ctx, LV_TEXT_ALIGN_LEFT);
+    ui.controls_remaining_lbl = media_control_create_controls_time_label(
+      ui.content_box, ctx, LV_TEXT_ALIGN_RIGHT);
+    ui.controls_progress_slider = lv_slider_create(ui.content_box);
+  }
+  if (lv_obj_t *slider = ui.controls_progress_slider) {
+    lv_slider_set_range(slider, 0, 100);
+    lv_obj_set_style_bg_color(
+      slider, lv_color_hex(theme_display_color(current_theme().track_background)), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(slider, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(slider, lv_color_hex(ctx->accent_color), LV_PART_INDICATOR);
+    lv_obj_set_style_bg_opa(slider, LV_OPA_COVER, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(slider, lv_color_hex(current_theme().text_primary), LV_PART_KNOB);
+    lv_obj_set_style_bg_opa(slider, LV_OPA_COVER, LV_PART_KNOB);
+    lv_obj_set_style_border_width(slider, 0, LV_PART_MAIN);
+    lv_obj_set_style_border_width(slider, 0, LV_PART_KNOB);
+    lv_obj_set_style_shadow_width(slider, 0, LV_PART_KNOB);
+    lv_obj_set_style_outline_width(slider, 0, LV_PART_KNOB);
+    lv_obj_add_flag(slider, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_event_cb(slider, [](lv_event_t *) {
+      MediaControlModalUi &ui = media_control_modal_ui();
+      if (ui.active) ui.active->dragging_progress = true;
+    }, LV_EVENT_PRESSED, nullptr);
+    lv_obj_add_event_cb(slider, [](lv_event_t *e) {
+      MediaControlModalUi &ui = media_control_modal_ui();
+      if (!ui.active || ui.updating_progress || ui.active->duration <= 0.0f) return;
+      lv_obj_t *target = static_cast<lv_obj_t *>(lv_event_get_target(e));
+      media_control_set_controls_time_labels(
+        ui.active, ui.active->duration * lv_slider_get_value(target) / 100.0f);
+    }, LV_EVENT_VALUE_CHANGED, nullptr);
+    lv_obj_add_event_cb(slider, [](lv_event_t *e) {
+      media_control_seek_to_slider(static_cast<lv_obj_t *>(lv_event_get_target(e)));
+    }, LV_EVENT_RELEASED, nullptr);
+    lv_obj_add_event_cb(slider, [](lv_event_t *) {
+      MediaControlModalUi &ui = media_control_modal_ui();
+      if (!ui.active) return;
+      ui.active->dragging_progress = false;
+      media_control_refresh_progress(ui.active);
+    }, LV_EVENT_PRESS_LOST, nullptr);
+  }
+
+  // Same grouped-speaker volume bookkeeping as the Volume tab.
+  if (!ui.speaker_action_timer) {
+    ui.speaker_action_timer = lv_timer_create(media_control_speaker_action_timer_cb, 500, nullptr);
+  }
+  media_control_refresh_group_member_volumes(ctx);
+  ui.controls_volume_bar = lv_obj_create(ui.content_box);
+  if (lv_obj_t *bar = ui.controls_volume_bar) {
+    lv_obj_set_style_bg_color(
+      bar, lv_color_hex(theme_display_color(current_theme().surface_primary)), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_width(bar, 0, LV_PART_MAIN);
+    lv_obj_set_style_shadow_width(bar, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(bar, 0, LV_PART_MAIN);
+    lv_obj_set_style_clip_corner(bar, true, LV_PART_MAIN);
+    lv_obj_clear_flag(bar, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(bar, LV_OBJ_FLAG_CLICKABLE);
+    ui.volume_plus_btn = media_control_create_volume_bar_key(
+      bar, ctx, find_icon("Plus"), MEDIA_CONTROL_COMBINED_VOLUME_STEP);
+    ui.volume_minus_btn = media_control_create_volume_bar_key(
+      bar, ctx, find_icon("Minus"), -MEDIA_CONTROL_COMBINED_VOLUME_STEP);
+    ui.volume_pct_lbl = lv_label_create(bar);
+    if (ui.volume_pct_lbl) {
+      lv_label_set_display_text(ui.volume_pct_lbl, "0");
+      lv_obj_set_style_text_color(ui.volume_pct_lbl, lv_color_hex(current_theme().text_primary), LV_PART_MAIN);
+      lv_obj_set_style_text_align(ui.volume_pct_lbl, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+      if (ctx->title_font) lv_obj_set_style_text_font(ui.volume_pct_lbl, ctx->title_font, LV_PART_MAIN);
+      apply_text_width_compensation(ui.volume_pct_lbl);
+    }
+    media_control_refresh_volume_controls(ctx);
+  }
 }
 
 inline void media_control_create_progress_tab_content(MediaControlCtx *ctx) {
@@ -3477,19 +3668,7 @@ inline void media_control_create_progress_tab_content(MediaControlCtx *ctx) {
     if (ui.active) ui.active->dragging_progress = true;
   }, LV_EVENT_PRESSED, nullptr);
   lv_obj_add_event_cb(ui.progress_slider, [](lv_event_t *e) {
-    MediaControlModalUi &ui = media_control_modal_ui();
-    if (!ui.active) return;
-    ui.active->dragging_progress = false;
-    if (!ui.active->available || ui.active->duration <= 0.0f) return;
-    lv_obj_t *slider = static_cast<lv_obj_t *>(lv_event_get_target(e));
-    int value = lv_slider_get_value(slider);
-    ui.active->seek_pending = true;
-    ui.active->seek_target_seconds = ui.active->duration * value / 100.0f;
-    ui.active->seek_pending_ms = esphome::millis();
-    ui.active->position_seconds = ui.active->seek_target_seconds;
-    ui.active->position_updated_ms = ui.active->seek_pending_ms;
-    media_control_refresh_progress(ui.active);
-    send_media_seek_action(ui.active->entity_id, value, ui.active->duration);
+    media_control_seek_to_slider(static_cast<lv_obj_t *>(lv_event_get_target(e)));
   }, LV_EVENT_RELEASED, nullptr);
   lv_obj_add_event_cb(ui.progress_slider, [](lv_event_t *) {
     MediaControlModalUi &ui = media_control_modal_ui();
@@ -4475,6 +4654,10 @@ inline void media_control_clear_tab_content() {
   ui.next_btn = nullptr;
   ui.repeat_btn = nullptr;
   ui.repeat_icon_lbl = nullptr;
+  ui.controls_progress_slider = nullptr;
+  ui.controls_elapsed_lbl = nullptr;
+  ui.controls_remaining_lbl = nullptr;
+  ui.controls_volume_bar = nullptr;
   ui.volume_arc = nullptr;
   ui.volume_group_lbl = nullptr;
   ui.volume_pct_lbl = nullptr;
@@ -4656,7 +4839,19 @@ inline void media_control_layout_modal(MediaControlCtx *ctx) {
     ? artist_font->line_height : control_modal_scaled_px(24, layout.short_side);
   lv_coord_t title_h = title_line_h;
   lv_coord_t title_max_h = title_line_h * 2;
-  lv_coord_t text_w = content_w * 92 / 100;
+  // With the volume pill, the Controls tab keeps its left part for the
+  // title, buttons, and track bar.
+  lv_coord_t volume_bar_w = 0;
+  lv_coord_t volume_bar_gap = 0;
+  if (ui.controls_volume_bar) {
+    volume_bar_w = control_modal_scaled_px(84, layout.short_side);
+    if (volume_bar_w < 60) volume_bar_w = 60;
+    volume_bar_gap = control_modal_scaled_px(16, layout.short_side);
+    if (volume_bar_gap < 10) volume_bar_gap = 10;
+  }
+  const lv_coord_t controls_w = content_w - volume_bar_w - volume_bar_gap;
+  const lv_coord_t controls_shift_x = -(volume_bar_w + volume_bar_gap) / 2;
+  lv_coord_t text_w = controls_w * 92 / 100;
   lv_coord_t text_gap = control_modal_scaled_px(8, layout.short_side);
   if (text_gap < 6) text_gap = 6;
   int transport_button_scale_percent = 100;
@@ -4665,7 +4860,7 @@ inline void media_control_layout_modal(MediaControlCtx *ctx) {
   }
   const espcontrol::media::MediaTransportLayout transport_layout =
     espcontrol::media::media_transport_layout(
-      content_w, layout.short_side,
+      controls_w, layout.short_side,
       media_control_shuffle_supported(ctx),
       media_control_repeat_supported(ctx),
       control_modal_uses_compact_portrait_tuning(layout) && layout.sh > layout.sw,
@@ -4687,7 +4882,15 @@ inline void media_control_layout_modal(MediaControlCtx *ctx) {
   if (progress_radius > 34) progress_radius = 34;
   lv_coord_t controls_bottom_gap = control_modal_scaled_px(10, layout.short_side);
   if (controls_bottom_gap < 6) controls_bottom_gap = 6;
-  lv_coord_t button_y = content_h - transport_layout.total_height - controls_bottom_gap;
+  lv_coord_t controls_time_h = 0;
+  lv_coord_t controls_progress_gap = 0;
+  if (ui.controls_progress_slider) {
+    controls_time_h = artist_h;
+    controls_progress_gap = control_modal_scaled_px(14, layout.short_side);
+    if (controls_progress_gap < 8) controls_progress_gap = 8;
+  }
+  lv_coord_t button_y = content_h - transport_layout.total_height - controls_bottom_gap -
+    controls_time_h - controls_progress_gap;
   if (ui.title_lbl) {
     const char *title_text = lv_label_get_text(ui.title_lbl);
     lv_point_t title_size;
@@ -4709,11 +4912,61 @@ inline void media_control_layout_modal(MediaControlCtx *ctx) {
   if (text_top < min_text_top) text_top = min_text_top;
   if (ui.title_lbl) {
     lv_obj_set_size(ui.title_lbl, text_w, title_h);
-    lv_obj_align(ui.title_lbl, LV_ALIGN_TOP_MID, 0, text_top);
+    lv_obj_align(ui.title_lbl, LV_ALIGN_TOP_MID, controls_shift_x, text_top);
   }
   if (ui.artist_lbl) {
     lv_obj_set_size(ui.artist_lbl, text_w, artist_h);
-    lv_obj_align(ui.artist_lbl, LV_ALIGN_TOP_MID, 0, text_top + title_h + text_gap);
+    lv_obj_align(ui.artist_lbl, LV_ALIGN_TOP_MID, controls_shift_x, text_top + title_h + text_gap);
+  }
+  if (ui.controls_progress_slider) {
+    // Times sit at both ends of a thin bar under the transport buttons.
+    lv_point_t time_size;
+    lv_text_get_size(&time_size, "-0:00:00", artist_font, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+    lv_coord_t time_w = time_size.x + control_modal_scaled_px(4, layout.short_side);
+    const lv_coord_t bar_gap = control_modal_scaled_px(10, layout.short_side);
+    if (time_w > controls_w / 4) time_w = controls_w / 4;
+    lv_coord_t bar_h = control_modal_scaled_px(8, layout.short_side);
+    if (bar_h < 6) bar_h = 6;
+    const lv_coord_t row_y = content_h - controls_bottom_gap - controls_time_h;
+    const lv_coord_t bar_w = controls_w - (time_w + bar_gap) * 2;
+    lv_obj_t *slider = ui.controls_progress_slider;
+    lv_obj_set_size(slider, bar_w > 0 ? bar_w : 1, bar_h);
+    lv_obj_set_style_radius(slider, bar_h / 2, LV_PART_MAIN);
+    lv_obj_set_style_radius(slider, bar_h / 2, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(slider, LV_RADIUS_CIRCLE, LV_PART_KNOB);
+    lv_obj_set_style_pad_all(slider, bar_h / 2 + 2, LV_PART_KNOB);
+    lv_obj_set_ext_click_area(slider, control_modal_scaled_px(18, layout.short_side));
+    lv_obj_align(slider, LV_ALIGN_TOP_LEFT, time_w + bar_gap, row_y + (controls_time_h - bar_h) / 2);
+    if (ui.controls_elapsed_lbl) {
+      lv_obj_set_size(ui.controls_elapsed_lbl, time_w, controls_time_h);
+      lv_obj_align(ui.controls_elapsed_lbl, LV_ALIGN_TOP_LEFT, 0, row_y);
+    }
+    if (ui.controls_remaining_lbl) {
+      lv_obj_set_size(ui.controls_remaining_lbl, time_w, controls_time_h);
+      lv_obj_align(ui.controls_remaining_lbl, LV_ALIGN_TOP_LEFT, controls_w - time_w, row_y);
+    }
+  }
+  if (lv_obj_t *bar = ui.controls_volume_bar) {
+    lv_obj_set_size(bar, volume_bar_w, content_h);
+    lv_obj_set_style_radius(bar, volume_bar_w / 2, LV_PART_MAIN);
+    lv_obj_align(bar, LV_ALIGN_TOP_LEFT, content_w - volume_bar_w, 0);
+    lv_obj_t *keys[2] = {ui.volume_plus_btn, ui.volume_minus_btn};
+    for (lv_obj_t *key : keys) {
+      if (!key) continue;
+      lv_obj_set_size(key, volume_bar_w, volume_bar_w);
+      lv_obj_set_style_radius(key, volume_bar_w / 2, LV_PART_MAIN);
+      lv_obj_t *label = lv_obj_get_child(key, 0);
+      if (label) {
+        lv_obj_set_style_transform_zoom(label, 230, LV_PART_MAIN);
+        light_control_center_icon_label(label);
+      }
+    }
+    if (ui.volume_plus_btn) lv_obj_align(ui.volume_plus_btn, LV_ALIGN_TOP_MID, 0, 0);
+    if (ui.volume_minus_btn) lv_obj_align(ui.volume_minus_btn, LV_ALIGN_BOTTOM_MID, 0, 0);
+    if (ui.volume_pct_lbl) {
+      lv_obj_set_width(ui.volume_pct_lbl, volume_bar_w);
+      lv_obj_align(ui.volume_pct_lbl, LV_ALIGN_CENTER, 0, 0);
+    }
   }
   if (ui.progress_box && ui.progress_slider) {
     ui.progress_layout_ready = false;
@@ -4890,6 +5143,7 @@ inline MediaControlCtx *create_media_control_context(
   const auto media_config = espcontrol::media::decode_config_v1(p);
   ctx->power_entity = media_config.power_entity;
   ctx->control_tabs = media_config.control_tabs;
+  ctx->combined_controls = media_config.combined_controls;
   ctx->label = media_control_card_label(p);
   ctx->cover_art_mode = media_card_mode(p.sensor) == "cover_art";
   ctx->max_pct = media_volume_max_percent(p);

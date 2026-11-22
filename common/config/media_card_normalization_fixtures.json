@@ -270,6 +270,51 @@
     }
   },
   {
+    "name": "media combined controls is kept after tabs",
+    "input": "media_player.sonos;Living Room;Auto;Auto;control_modal;;media;;media_controls_combined,label_display=label,media_tabs=controls%7Cspeakers",
+    "expected": {
+      "entity": "media_player.sonos",
+      "label": "Living Room",
+      "icon": "Auto",
+      "icon_on": "Auto",
+      "sensor": "control_modal",
+      "unit": "",
+      "type": "media",
+      "precision": "",
+      "options": "media_tabs=controls%7Cspeakers,media_controls_combined,label_display=label"
+    }
+  },
+  {
+    "name": "media combined controls is kept on cover art",
+    "input": "media_player.sonos;;Auto;Auto;cover_art;;media;;media_controls_combined,power_entity=media_player.tv",
+    "expected": {
+      "entity": "media_player.sonos",
+      "label": "",
+      "icon": "Auto",
+      "icon_on": "Auto",
+      "sensor": "cover_art",
+      "unit": "",
+      "type": "media",
+      "precision": "",
+      "options": "power_entity=media_player.tv,media_controls_combined"
+    }
+  },
+  {
+    "name": "media combined controls is dropped on simple cards",
+    "input": "media_player.sonos;;Auto;Auto;play_pause;;media;;media_controls_combined",
+    "expected": {
+      "entity": "media_player.sonos",
+      "label": "",
+      "icon": "Auto",
+      "icon_on": "Auto",
+      "sensor": "play_pause",
+      "unit": "",
+      "type": "media",
+      "precision": "",
+      "options": ""
+    }
+  },
+  {
     "name": "media default tabs are omitted",
     "input": "media_player.sonos;Living Room;Auto;Auto;control_modal;;media;;media_tabs=controls%7Cprogress%7Cvolume%7Cspeakers%7Cpower",
     "expected": {

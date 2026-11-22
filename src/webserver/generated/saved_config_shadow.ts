@@ -164,6 +164,7 @@ export const SAVED_CONFIG_SHADOW_PILOT_POLICIES: Readonly<Record<string, CardNor
       "speaker_group_entity",
       "power_entity",
       "media_tabs",
+      "media_controls_combined",
       "volume_max",
       "playlist_content_id",
       "playlist_content_type",

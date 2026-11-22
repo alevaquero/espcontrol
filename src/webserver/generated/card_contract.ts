@@ -2895,6 +2895,23 @@ export const CARD_CONTRACT_CARDS: Readonly<Record<string, CardTypeSpec>> = {
         ]
       },
       {
+        "name": "media_controls_combined",
+        "label": "Volume and Position on Controls",
+        "kind": "flag",
+        "omitDefault": true,
+        "applicability": [
+          {
+            "source": "field",
+            "name": "sensor",
+            "operator": "in",
+            "value": [
+              "control_modal",
+              "cover_art"
+            ]
+          }
+        ]
+      },
+      {
         "name": "label_display",
         "label": "Label Display",
         "kind": "choice",
@@ -3040,6 +3057,7 @@ export const CARD_CONTRACT_CARDS: Readonly<Record<string, CardTypeSpec>> = {
         "speaker_group_entity",
         "power_entity",
         "media_tabs",
+        "media_controls_combined",
         "volume_max",
         "playlist_content_id",
         "playlist_content_type",
@@ -5289,6 +5307,7 @@ export const CARD_CONTRACT_OPTION_NAMES: Readonly<Record<string, string>> = {
   "light_tabs": "light_tabs",
   "lock_mode": "lock_mode",
   "lt": "lt",
+  "media_controls_combined": "media_controls_combined",
   "media_cover_art": "media_cover_art",
   "media_display": "media_display",
   "media_mode": "media_mode",

@@ -43,6 +43,14 @@ Add your Sonos, Spotify, Apple TV, Plex, Music Assistant, or other player integr
 
 For **All Controls** and **Cover Art**, open **Modal Settings** to reorder the popup tabs by dragging or using the up/down arrows, and switch off tabs you do not want. The popup opens the first available tab in your order. Unsupported tabs stay hidden; if none of your selected tabs is available, Controls remains available as a fallback.
 
+Switch on **Volume and Position on Controls** in **Modal Settings** to put volume and the track position on the Controls tab, so you rarely need to change tab:
+
+- A volume pill on the right has **+** at the top and **−** at the bottom, with the current level between them. Each tap changes the volume by 5%; players that only support volume up and down take one step per tap. With grouped speakers it changes the whole group, like the Volume tab.
+- A thin bar under the playback buttons shows the elapsed time on the left and the time left on the right. Drag it to jump through the track where the player supports seeking.
+- The bar and its times are hidden when the player reports no track length, such as a radio station.
+
+The separate Track Position and Volume tabs are unchanged; switch them off in the tab list if you no longer need them.
+
 ### Separate Power Device
 
 Inside **Modal Settings**, open **Optional Power** and enter a **Power Entity** to control another device from the Power tab. For example, use `media_player.living_room_sonos` as the main entity for playback and volume, and `media_player.living_room_tv` as the Power Entity for the TV. You can also select a `switch`, `input_boolean`, `light`, or `fan` entity.

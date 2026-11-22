@@ -350,6 +350,7 @@ constexpr const char *CARD_CONTRACT_OPTION_NAME_LAWN_MOWER_MODE = "lawn_mower_mo
 constexpr const char *CARD_CONTRACT_OPTION_NAME_LIGHT_TABS = "light_tabs";
 constexpr const char *CARD_CONTRACT_OPTION_NAME_LOCK_MODE = "lock_mode";
 constexpr const char *CARD_CONTRACT_OPTION_NAME_LT = "lt";
+constexpr const char *CARD_CONTRACT_OPTION_NAME_MEDIA_CONTROLS_COMBINED = "media_controls_combined";
 constexpr const char *CARD_CONTRACT_OPTION_NAME_MEDIA_COVER_ART = "media_cover_art";
 constexpr const char *CARD_CONTRACT_OPTION_NAME_MEDIA_DISPLAY = "media_display";
 constexpr const char *CARD_CONTRACT_OPTION_NAME_MEDIA_MODE = "media_mode";
