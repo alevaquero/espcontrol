@@ -7,25 +7,18 @@
 
 ## Development workflow
 
-- Resolve the active repository root with `git rev-parse --show-toplevel` and
-  use that worktree for repository files and commands. Do not assume the main
-  checkout's path; this repository is often used through linked worktrees.
-- Keep changes and checks in the worktree where the task was started unless a
-  workflow explicitly needs another branch or worktree.
-
-- Treat `main` as the stable branch.
-- For normal code, firmware, configuration, UI, or documentation changes, create a short-lived branch from the latest `main`.
-- Use a separate git worktree for feature or fix work so multiple issues can be developed and tested at the same time without changing `main`.
+- This repository is a standalone fork (alevaquero/espcontrol, git remote `fork`). It no longer syncs with the original jtenniswood/espcontrol project: never pull from or push to it.
+- Work in the single checkout at the repository root; do not create extra git worktrees unless the user asks or two unfinished changes must be tested side by side.
+- Treat `main` as the stable branch. Local `main` tracks `fork/main`.
+- For normal code, firmware, configuration, UI, or documentation changes, create a short-lived branch from the latest `main` in that checkout (`git switch -c <name> main`).
 - Use short, descriptive branch names like `fix-display-timeout` or `update-pr-workflow`; do not include `codex` in branch names or PR titles.
-- Infer the branch name from the requested outcome unless the task is ambiguous.
-- Keep each branch focused on one bug fix, feature, device change, cleanup, or documentation change.
-- If a request starts to include unrelated work, keep the extra work out of the branch unless the user explicitly asks to include it.
-- Commit completed changes and push the branch.
-- Open a pull request marked ready for review so automated checks and review systems run, instead of merging directly to `main`.
-- Leave the pull request open until the user confirms they have tested it.
+- Keep each branch focused on one bug fix, feature, device change, cleanup, or documentation change. If a request starts to include unrelated work, keep it out unless the user explicitly asks to include it.
+- Build and flash the test panel from that branch. Use a real version so auto-update does not replace the test build: `ESPCONTROL_FIRMWARE_VERSION=vX.Y.Z ESPHOME_BIN=.venv/bin/esphome python3 scripts/local_esphome.py devices/esp32-p4-wifi6-touch-lcd-5/dev-local.yaml compile`, then the same command with `upload --device <panel IP>`. Components build from the committed `HEAD`, so commit before compiling; `upload` does not compile.
+- Commit completed changes, push the branch, and open a pull request marked ready for review. GitHub Actions is disabled on this fork, so run the relevant checks locally and say in the PR which ones ran.
+- Leave the pull request open until the user confirms they have tested it, then squash-merge it, delete the branch, and switch back to `main`.
+- After merging, publish the tested build as the panel's online update: `ESPHOME_BIN=.venv/bin/esphome python3 scripts/publish_fork_firmware.py devices/esp32-p4-wifi6-touch-lcd-5/dev-local.yaml --version vX.Y.Z` (add `--skip-compile` to publish the build already on the panel).
 - Do not close related GitHub issues until the user confirms the fix works.
-- Only work directly on `main` when the user explicitly asks for it, or for a tiny emergency/documentation-only change where a PR would add no value.
-- After a pull request is merged, clean up its local worktree and branch when practical.
+- Only work directly on `main` when the user explicitly asks for it, or for a tiny documentation-only change where a PR would add no value.
 
 ## Pull requests
 

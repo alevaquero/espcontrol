@@ -2,6 +2,8 @@
 
 # EspControl
 
+> **About this fork:** this is a standalone copy of [jtenniswood/espcontrol](https://github.com/jtenniswood/espcontrol), maintained separately and no longer kept in sync with it. It adds support for the Waveshare ESP32-P4-WIFI6-Touch-LCD-5 and its own features (such as Playlists, Artists and Radios in the Media popup, and a Remote card). Panels running this fork's firmware get online updates from this repository's `firmware` branch, not from the original project. The documentation links below still point to the original project and may not describe this fork's changes.
+
 **Turn an affordable touchscreen into a simple smart home control panel.**
 
 EspControl lets you put the Home Assistant controls you use every day onto a dedicated screen: lights by the door, heating in the hallway, garage controls in the utility room, room temperatures on a desk, or a tidy bedside panel for scenes and alarms.
