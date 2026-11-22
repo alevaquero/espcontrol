@@ -79,7 +79,7 @@ def resolve_yaml_path(yaml_arg: str, cwd: Path | None = None) -> Path:
 
 
 def local_version_for(_yaml_path: Path) -> str:
-    return "dev"
+    return os.environ.get("ESPCONTROL_FIRMWARE_VERSION") or "dev"
 
 
 def build_esphome_command(
@@ -182,7 +182,13 @@ class LocalEsphomeTests(unittest.TestCase):
 
     def test_uses_dev_firmware_version(self) -> None:
         path = ROOT / "devices" / "esp32-p4-86" / "dev.yaml"
-        self.assertEqual(local_version_for(path), "dev")
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(local_version_for(path), "dev")
+
+    def test_uses_firmware_version_from_environment(self) -> None:
+        path = ROOT / "devices" / "esp32-p4-86" / "dev.yaml"
+        with mock.patch.dict(os.environ, {"ESPCONTROL_FIRMWARE_VERSION": "1.2.3"}):
+            self.assertEqual(local_version_for(path), "1.2.3")
 
     def test_builds_esphome_command_with_firmware_version_substitution(self) -> None:
         command = build_esphome_command(
