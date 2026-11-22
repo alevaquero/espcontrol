@@ -197,7 +197,9 @@ update:
     id: firmware_update
     name: "${entity_firmware_update}"
     internal: true
-    source: https://jtenniswood.github.io/espcontrol/firmware/${firmware_manifest_slug}/manifest.json
+    # This fork publishes its builds to the firmware branch with
+    # scripts/publish_fork_firmware.py.
+    source: https://raw.githubusercontent.com/alevaquero/espcontrol/firmware/${firmware_manifest_slug}/manifest.json
     update_interval: never
     on_update_available:
       then:
