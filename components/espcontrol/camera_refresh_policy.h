@@ -29,6 +29,11 @@ inline uint32_t refresh_interval_ms(const std::string &value) {
   return value == "5" ? 5000 : value == "30" ? 30000 : 10000;
 }
 
+// On-activity refresh accepts 1-5 seconds and defaults to 5.
+inline uint32_t activity_interval_ms(const std::string &value) {
+  return value.size() == 1 && value[0] >= '1' && value[0] <= '5' ? (value[0] - '0') * 1000U : 5000;
+}
+
 inline bool valid_state(const std::string &value) {
   return !value.empty() && value != "unknown" && value != "unavailable" && value != "None";
 }
@@ -62,6 +67,7 @@ struct ActivityTrigger {
 struct RefreshSchedule {
   RefreshMode mode = RefreshMode::OFF;
   uint32_t interval_ms = 10000;
+  uint32_t activity_interval_ms = 5000;
   uint32_t window_end = 0;
   uint32_t next_due = 0;
   uint32_t last_completed = 0;
@@ -71,7 +77,7 @@ struct RefreshSchedule {
   bool in_flight = false;
   bool completed = false;
 
-  uint32_t interval() const { return mode == RefreshMode::ACTIVITY ? 5000 : interval_ms; }
+  uint32_t interval() const { return mode == RefreshMode::ACTIVITY ? activity_interval_ms : interval_ms; }
   void close() {
     open = window = in_flight = completed = false;
     failures = 0;
@@ -96,8 +102,8 @@ struct RefreshSchedule {
     window = true;
     window_end = now + 30000;
     if (!running && failures == 0) {
-      next_due = completed && static_cast<uint32_t>(now - last_completed) < 5000
-          ? last_completed + 5000 : now;
+      next_due = completed && static_cast<uint32_t>(now - last_completed) < activity_interval_ms
+          ? last_completed + activity_interval_ms : now;
     }
   }
   bool enabled(uint32_t now) const {

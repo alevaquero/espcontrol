@@ -14,6 +14,20 @@ int main() {
   assert(refresh_interval_ms("3") == 10000);
   assert(refresh_interval_ms("5") == 5000);
   assert(refresh_interval_ms("invalid") == 10000);
+  assert(activity_interval_ms("1") == 1000);
+  assert(activity_interval_ms("4") == 4000);
+  assert(activity_interval_ms("") == 5000);
+  for (const char *bad : {"0", "6", "10", "x"}) assert(activity_interval_ms(bad) == 5000);
+
+  RefreshSchedule fast;
+  fast.mode = RefreshMode::ACTIVITY;
+  fast.activity_interval_ms = 1000;
+  fast.begin(0, true);
+  assert(fast.due(0, true));
+  fast.started();
+  fast.finished(300, true);
+  assert(!fast.due(1299, true));
+  assert(fast.due(1300, true)); // A 1-second setting waits from the completed download.
 
   RefreshSchedule periodic;
   periodic.mode = RefreshMode::PERIODIC;

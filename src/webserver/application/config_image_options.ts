@@ -185,6 +185,11 @@ export function createConfigImageOptionsFeature(dependencies: ConfigImageOptions
             } else if (mode === "activity" && (draft || validImageRefreshTrigger(trigger))) {
                 out = setConfigOptionValue(out, "image_modal_refresh_mode", mode);
                 out = setConfigOptionValue(out, "image_modal_refresh_trigger", trigger);
+                const activityInterval = configOptionValue(options, "image_modal_activity_interval");
+                if (["1", "2", "3", "4"].includes(activityInterval))
+                    out = setConfigOptionValue(out, "image_modal_activity_interval", activityInterval);
+                if (configOptionEnabled(options, "image_modal_activity_open"))
+                    out = setConfigOption(out, "image_modal_activity_open", true);
             }
         }
         return preserveCardColorOptions(options, out);
