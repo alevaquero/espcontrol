@@ -3811,6 +3811,31 @@ export const CARD_CONTRACT_CARDS: Readonly<Record<string, CardTypeSpec>> = {
             "rainfall"
           ]
         }
+      },
+      {
+        "name": "current_temperature",
+        "label": "Temperature",
+        "kind": "choice",
+        "values": [
+          "off",
+          "top_right",
+          "bottom_right"
+        ],
+        "defaultValue": "off",
+        "omitDefault": true,
+        "applicability": [
+          {
+            "source": "field",
+            "name": "precision",
+            "operator": "equals",
+            "value": ""
+          }
+        ],
+        "supportedWhen": {
+          "precision": [
+            ""
+          ]
+        }
       }
     ],
     "normalization": {
@@ -3851,7 +3876,8 @@ export const CARD_CONTRACT_CARDS: Readonly<Record<string, CardTypeSpec>> = {
       "unknownOptions": "drop",
       "canonicalOptionOrder": [
         "wind_source",
-        "rainfall_source"
+        "rainfall_source",
+        "current_temperature"
       ],
       "migrationActions": [
         "legacy_weather_forecast"
@@ -4925,6 +4951,7 @@ export const CARD_CONTRACT_OPTION_NAMES: Readonly<Record<string, string>> = {
   "cover_mode": "cover_mode",
   "cover_position": "cover_position",
   "cover_tabs": "cover_tabs",
+  "current_temperature": "current_temperature",
   "date_time_mode": "date_time_mode",
   "fan_light_entity": "fan_light_entity",
   "fan_tabs": "fan_tabs",

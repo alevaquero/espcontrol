@@ -20,11 +20,12 @@ export interface WeatherCardRegistration {
 export function registerWeatherCardTypes(
     registry: CardRegistry,
     weatherOptions: ConfigWeatherOptionsFeature,
-    _clockBar: Pick<ClockBarFeature, "temperatureUnitSymbol">,
+    clockBar: Pick<ClockBarFeature, "temperatureUnitSymbol">,
     fields: ControlsFieldsFeature,
     cardUi: CardUiServices,
 ): WeatherCardRegistration {
     const { renderButtonSettings } = cardUi;
+    const { temperatureUnitSymbol } = clockBar;
     const { cardBadgeLabelHtml } = fields;
     const {
         weatherCardIsForecastMode,
@@ -32,6 +33,7 @@ export function registerWeatherCardTypes(
         normalizeWeatherCardMode,
         weatherWindUsesSensors,
         rainfallUsesForecast,
+        weatherCurrentTemperature,
         weatherForecastCardsSupported,
     } = weatherOptions;
     // Current conditions or a shared forecast layout for one or several days.
@@ -175,6 +177,18 @@ export function registerWeatherCardTypes(
             helpers.renderCardEntityField(panel, b, helpers, {
                 entity: { ...WEATHER_CARD_METADATA.entity, domains: ["weather"] },
             });
+            helpers.renderCardSegmentControl(panel, b, helpers, {
+                segment: {
+                    label: "Temperature",
+                    options: [["off", "Off"], ["top_right", "Top Right"], ["bottom_right", "Bottom Right"]],
+                    value: function (this: any) { return weatherCurrentTemperature(b); },
+                    onSelect: function (this: any, button?: any, cardHelpers?: any, value?: any) {
+                        button.options = setConfigOptionValue(button.options, "current_temperature", value === "off" ? "" : value);
+                        cardHelpers.saveField("options", button.options);
+                        renderButtonSettings();
+                    },
+                },
+            });
         },
         renderPreview: function (this: any, b?: any, helpers?: any) {
             if (b.precision === "wind") {
@@ -203,8 +217,16 @@ export function registerWeatherCardTypes(
                     labelHtml: "",
                 };
             }
+            const temperature = weatherCurrentTemperature(b);
+            const temperatureHtml = temperature === "top_right"
+                ? '<span class="sp-weather-current-temperature sp-weather-current-temperature-top">' +
+                    '<span class="sp-sensor-value">18</span><span class="sp-sensor-unit">' + helpers.escHtml(temperatureUnitSymbol()) + '</span></span>'
+                : temperature === "bottom_right"
+                    ? '<span class="sp-weather-current-temperature sp-weather-current-temperature-bottom">18°</span>'
+                    : "";
             return {
-                iconHtml: '<span class="sp-btn-icon mdi mdi-weather-cloudy"></span>',
+                buttonClass: temperature === "bottom_right" ? "sp-weather-current-bottom-temperature" : undefined,
+                iconHtml: '<span class="sp-btn-icon mdi mdi-weather-cloudy"></span>' + temperatureHtml,
                 labelHtml: cardBadgeLabelHtml(helpers, "Cloudy", WEATHER_CARD_METADATA.preview.currentBadge),
                 labelEditable: false,
             };

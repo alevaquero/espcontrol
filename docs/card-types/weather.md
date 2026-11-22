@@ -23,7 +23,8 @@ Show current conditions or daily forecasts from a Home Assistant weather entity.
    - **Today's Forecast** — today's icon and high/low temperatures.
    - **Tomorrow's Forecast** — tomorrow's icon and high/low temperatures.
    - **Daily Forecast** — up to eight days in a row or grid.
-4. Resize the card in the preview, optionally choose **Custom Colours**, then press **Save**.
+4. For **Current Conditions**, choose **Temperature** to also show the current temperature: **Top Right** shows it in the large number font with its unit, **Bottom Right** shows it next to the condition label in the same smaller font, or **Off** hides it.
+5. Resize the card in the preview, optionally choose **Custom Colours**, then press **Save**.
 
 ::: tip Home Assistant actions permission
 Enable **Allow the device to perform Home Assistant actions** so the panel can request forecasts. See [Enable Actions](/getting-started/home-assistant-actions).

@@ -7,6 +7,7 @@
 #include "card_modal_target.h"
 #include "button_grid_weather_wind.h"
 #include "button_grid_rainfall.h"
+#include "button_grid_weather_current.h"
 
 namespace espcontrol::cards {
 
@@ -63,6 +64,7 @@ inline bool weather_driver_setup_visual(
   lv_label_set_display_text(slot.sensor_lbl, "");
   lv_label_set_display_text(slot.unit_lbl, "");
   lv_label_set_display_text(slot.text_lbl, espcontrol_i18n("Cloudy"));
+  weather_current_temperature_layout(slot, weather_current_temperature_position(config));
   return true;
 }
 
@@ -92,6 +94,8 @@ inline bool weather_driver_bind_data(
   }
   if (!config.entity.empty()) {
     subscribe_weather_state(slot.icon_lbl, slot.text_lbl, config.entity);
+    subscribe_weather_current_temperature(
+      slot, config.entity, weather_current_temperature_position(config));
   }
   return true;
 }

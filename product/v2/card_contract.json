@@ -4307,6 +4307,31 @@
               "rainfall"
             ]
           }
+        },
+        {
+          "name": "current_temperature",
+          "label": "Temperature",
+          "kind": "choice",
+          "values": [
+            "off",
+            "top_right",
+            "bottom_right"
+          ],
+          "defaultValue": "off",
+          "omitDefault": true,
+          "applicability": [
+            {
+              "source": "field",
+              "name": "precision",
+              "operator": "equals",
+              "value": ""
+            }
+          ],
+          "supportedWhen": {
+            "precision": [
+              ""
+            ]
+          }
         }
       ],
       "normalization": {
@@ -4347,7 +4372,8 @@
         "unknownOptions": "drop",
         "canonicalOptionOrder": [
           "wind_source",
-          "rainfall_source"
+          "rainfall_source",
+          "current_temperature"
         ],
         "migrationActions": [
           "legacy_weather_forecast"
