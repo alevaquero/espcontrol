@@ -1191,6 +1191,19 @@ export const CARD_CONTRACT_CARDS: Readonly<Record<string, CardTypeSpec>> = {
         "label": "Large Temperature Numbers",
         "kind": "flag",
         "omitDefault": true
+      },
+      {
+        "name": "mode_icon",
+        "label": "Mode Icon",
+        "kind": "choice",
+        "values": [
+          "off",
+          "center",
+          "top_right",
+          "bottom_right"
+        ],
+        "defaultValue": "off",
+        "omitDefault": true
       }
     ],
     "normalization": {
@@ -1235,7 +1248,8 @@ export const CARD_CONTRACT_CARDS: Readonly<Record<string, CardTypeSpec>> = {
         "label_display",
         "number_display",
         "temperature_step",
-        "large_numbers"
+        "large_numbers",
+        "mode_icon"
       ],
       "optionHook": "normalize_climate_options"
     },
@@ -1316,6 +1330,19 @@ export const CARD_CONTRACT_CARDS: Readonly<Record<string, CardTypeSpec>> = {
         "omitDefault": true
       },
       {
+        "name": "mode_icon",
+        "label": "Mode Icon",
+        "kind": "choice",
+        "values": [
+          "off",
+          "center",
+          "top_right",
+          "bottom_right"
+        ],
+        "defaultValue": "off",
+        "omitDefault": true
+      },
+      {
         "name": "climate_tabs",
         "label": "Visible Tabs",
         "kind": "text",
@@ -1366,6 +1393,7 @@ export const CARD_CONTRACT_CARDS: Readonly<Record<string, CardTypeSpec>> = {
         "number_display",
         "temperature_step",
         "large_numbers",
+        "mode_icon",
         "climate_tabs"
       ],
       "optionHook": "normalize_climate_options"
@@ -5044,6 +5072,7 @@ export const CARD_CONTRACT_OPTION_NAMES: Readonly<Record<string, string>> = {
   "media_mode": "media_mode",
   "media_now_playing_controls": "media_now_playing_controls",
   "media_tabs": "media_tabs",
+  "mode_icon": "mode_icon",
   "number_display": "number_display",
   "on_pattern": "on_pattern",
   "pass64": "pass64",

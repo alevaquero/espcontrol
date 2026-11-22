@@ -38,6 +38,8 @@ export function registerClimateCardTypes(
         setClimateNumberDisplayMode,
         climateTemperatureStep,
         setClimateTemperatureStep,
+        climateModeIcon,
+        setClimateModeIcon,
         parseClimatePrecisionConfig,
         climatePrecisionConfig,
     } = accessOptions;
@@ -82,6 +84,15 @@ export function registerClimateCardTypes(
             supported: function (this: any, b?: any) {
                 return climateNumberDisplayMode(b) !== "icon";
             },
+        },
+        modeIcon: {
+            label: "Mode Icon",
+            options: [
+                ["off", "Off"],
+                ["center", "Center"],
+                ["top_right", "Top Right"],
+                ["bottom_right", "Bottom Right"],
+            ],
         },
         preview: {
             badge: "thermostat",
@@ -213,6 +224,16 @@ export function registerClimateCardTypes(
                 renderQueue.schedule();
             });
             helpers.renderCardLargeNumbersToggle(cardSettings, b, helpers, CLIMATE_CARD_METADATA);
+            helpers.renderCardSegmentControl(cardSettings, b, helpers, {
+                segment: Object.assign({}, CLIMATE_CARD_METADATA.modeIcon, {
+                    value: function (this: any) { return climateModeIcon(b); },
+                    onSelect: function (this: any, button?: any, cardHelpers?: any, value?: any) {
+                        setClimateModeIcon(button, value);
+                        cardHelpers.saveField("options", button.options);
+                        renderQueue.schedule();
+                    },
+                }),
+            });
             panel.appendChild(cardSettingsDisclosure.panel);
             panel.appendChild(modalTabsDisclosure.panel);
             var advancedDisclosure: any = helpers.disclosureSection("Advanced", helpers.idPrefix + "climate-advanced", false);
@@ -253,17 +274,23 @@ export function registerClimateCardTypes(
             function climateLabelHtml(this: any) {
                 return cardBadgeLabelHtml(helpers, label, CLIMATE_CARD_METADATA.preview.badge);
             }
+            // The preview shows Heat; the panel shows the live HVAC mode.
+            var modeIconPosition: any = climateModeIcon(b);
+            var modeIconHtml: any = modeIconPosition !== "off"
+                ? '<span class="sp-climate-mode-icon sp-climate-mode-icon-' + modeIconPosition +
+                    ' mdi mdi-' + iconSlug("Fire") + '"></span>'
+                : "";
             if (numberMode === "icon") {
                 var iconName: any = b.icon && b.icon !== "Auto" ? b.icon : "Thermostat";
                 return {
-                    iconHtml: '<span class="sp-btn-icon mdi mdi-' + iconSlug(iconName) + '"></span>',
+                    iconHtml: '<span class="sp-btn-icon mdi mdi-' + iconSlug(iconName) + '"></span>' + modeIconHtml,
                     labelHtml: climateLabelHtml(),
                     labelEditable: labelMode === "label",
                 };
             }
             return {
                 buttonClass: "sp-climate-temp-card",
-                iconHtml: cardSensorPreviewHtml(b, helpers, numberVal, unit),
+                iconHtml: cardSensorPreviewHtml(b, helpers, numberVal, unit) + modeIconHtml,
                 labelHtml: climateLabelHtml(),
                 labelEditable: labelMode === "label",
             };

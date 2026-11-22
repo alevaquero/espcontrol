@@ -3737,6 +3737,19 @@
             "label": "Large Temperature Numbers",
             "kind": "flag",
             "omitDefault": true
+          },
+          {
+            "name": "mode_icon",
+            "label": "Mode Icon",
+            "kind": "choice",
+            "values": [
+              "off",
+              "center",
+              "top_right",
+              "bottom_right"
+            ],
+            "defaultValue": "off",
+            "omitDefault": true
           }
         ],
         "normalization": {
@@ -3781,7 +3794,8 @@
             "label_display",
             "number_display",
             "temperature_step",
-            "large_numbers"
+            "large_numbers",
+            "mode_icon"
           ],
           "optionHook": "normalize_climate_options"
         },
@@ -3862,6 +3876,19 @@
             "omitDefault": true
           },
           {
+            "name": "mode_icon",
+            "label": "Mode Icon",
+            "kind": "choice",
+            "values": [
+              "off",
+              "center",
+              "top_right",
+              "bottom_right"
+            ],
+            "defaultValue": "off",
+            "omitDefault": true
+          },
+          {
             "name": "climate_tabs",
             "label": "Visible Tabs",
             "kind": "text",
@@ -3912,6 +3939,7 @@
             "number_display",
             "temperature_step",
             "large_numbers",
+            "mode_icon",
             "climate_tabs"
           ],
           "optionHook": "normalize_climate_options"

@@ -147,6 +147,11 @@ export function createConfigAccessClimateAlarmOptionsFeature(
         var values: any = spec && spec.values ? spec.values : [];
         return values.indexOf(value) >= 0 ? value : climateDefaultTemperatureStep();
     }
+    var CLIMATE_MODE_ICON_OPTION: any = "mode_icon";
+    // Where the optional HVAC mode icon sits on the card; "off" hides it.
+    function normalizeClimateModeIcon(this: any, value?: any) {
+        return value === "center" || value === "top_right" || value === "bottom_right" ? value : "off";
+    }
     function normalizeClimateOptions(this: any, options?: any, includeControlTabs?: any) {
         var labelMode: any = normalizeClimateLabelDisplayMode(configOptionValue(options, CLIMATE_LABEL_DISPLAY_OPTION));
         var numberMode: any = normalizeClimateNumberDisplayMode(configOptionValue(options, CLIMATE_NUMBER_DISPLAY_OPTION));
@@ -163,6 +168,10 @@ export function createConfigAccessClimateAlarmOptionsFeature(
         }
         if (numberMode !== "icon") {
             out = copyLargeNumbersOption(out, options);
+        }
+        var modeIcon: any = normalizeClimateModeIcon(configOptionValue(options, CLIMATE_MODE_ICON_OPTION));
+        if (modeIcon !== "off") {
+            out = setConfigOptionValue(out, CLIMATE_MODE_ICON_OPTION, modeIcon);
         }
         if (includeControlTabs) {
             var tabs: any = normalizeClimateControlTabs(configOptionValue(options, CLIMATE_CONTROL_TABS_OPTION));
@@ -191,6 +200,17 @@ export function createConfigAccessClimateAlarmOptionsFeature(
             return "";
         var normalized: any = normalizeClimateNumberDisplayMode(mode);
         b.options = setConfigOptionValue(b.options, CLIMATE_NUMBER_DISPLAY_OPTION, normalized === climateDefaultNumberDisplayMode() ? "" : normalized);
+        b.options = normalizeClimateOptions(b.options, isClimateCardType(b.type));
+        return b.options;
+    }
+    function climateModeIcon(this: any, b?: any) {
+        return normalizeClimateModeIcon(configOptionValue(b && b.options, CLIMATE_MODE_ICON_OPTION));
+    }
+    function setClimateModeIcon(this: any, b?: any, position?: any) {
+        if (!b)
+            return "";
+        var normalized: any = normalizeClimateModeIcon(position);
+        b.options = setConfigOptionValue(b.options, CLIMATE_MODE_ICON_OPTION, normalized === "off" ? "" : normalized);
         b.options = normalizeClimateOptions(b.options, isClimateCardType(b.type));
         return b.options;
     }
@@ -414,6 +434,8 @@ export function createConfigAccessClimateAlarmOptionsFeature(
         setClimateNumberDisplayMode,
         climateTemperatureStep,
         setClimateTemperatureStep,
+        climateModeIcon,
+        setClimateModeIcon,
         alarmActionInfo,
         alarmActionValues,
         alarmPinRequired,

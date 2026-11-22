@@ -116,6 +116,7 @@ struct ClimateControlCtx {
   int precision = 0;
   std::string label_display = "label";
   std::string number_display = "target";
+  std::string mode_icon_position;  // Empty when off, else center/top_right/bottom_right.
   // Keep reports separate while plus/minus edits wait for their debounce.
   int reported_target_tenths = CLIMATE_DEFAULT_TARGET_TENTHS;
   int reported_low_tenths = CLIMATE_DEFAULT_LOW_TENTHS;
@@ -135,6 +136,7 @@ struct ClimateControlCtx {
   lv_obj_t *sensor_container = nullptr;
   lv_obj_t *value_lbl = nullptr;
   lv_obj_t *unit_lbl = nullptr;
+  lv_obj_t *mode_icon_lbl = nullptr;  // Optional HVAC mode icon in the card centre.
   const char *icon_off_glyph = nullptr;
   const char *icon_on_glyph = nullptr;
   int width_compensation_percent = 100;
@@ -1102,6 +1104,8 @@ inline void climate_layout_card_label(lv_obj_t *label_lbl) {
   lv_obj_move_foreground(label_lbl);
 }
 
+inline const char *climate_option_icon(const std::string &kind, const std::string &value);
+
 inline void climate_update_card(ClimateControlCtx *ctx) {
   if (!ctx) return;
   std::string value = climate_card_value(ctx);
@@ -1130,6 +1134,21 @@ inline void climate_update_card(ClimateControlCtx *ctx) {
   if (ctx->label_lbl) {
     lv_label_set_display_text(ctx->label_lbl, climate_card_label(ctx).c_str());
     climate_layout_card_label(ctx->label_lbl);
+  }
+  if (ctx->mode_icon_lbl) {
+    lv_label_set_display_text(ctx->mode_icon_lbl, climate_option_icon("hvac", ctx->hvac_mode));
+    const std::string &position = ctx->mode_icon_position;
+    lv_obj_align(ctx->mode_icon_lbl,
+                 position == "top_right" ? LV_ALIGN_TOP_RIGHT
+                 : position == "bottom_right" ? LV_ALIGN_BOTTOM_RIGHT
+                 : LV_ALIGN_CENTER, 0, 0);
+    if (position == "bottom_right" && ctx->label_lbl) {
+      // Keep long labels from wrapping underneath the icon. Padding, unlike a
+      // fixed width, is cleared when the slot is reused for another card.
+      lv_obj_update_layout(ctx->mode_icon_lbl);
+      lv_obj_set_style_pad_right(ctx->label_lbl,
+        lv_obj_get_width(ctx->mode_icon_lbl) + 6, LV_PART_MAIN);
+    }
   }
   if (ctx->btn) {
     set_card_checked_state(ctx->btn, climate_is_active(ctx));
@@ -2722,6 +2741,7 @@ inline ClimateControlCtx *create_climate_control_context(
   climate_apply_saved_range(ctx, p.precision);
   ctx->label_display = normalize_climate_label_display(cfg_option_value(p.options, "label_display"));
   ctx->number_display = normalize_climate_number_display(cfg_option_value(p.options, "number_display"));
+  ctx->mode_icon_position = normalize_climate_mode_icon(cfg_option_value(p.options, "mode_icon"));
   ctx->configured_step_tenths = normalize_climate_temperature_step(
     cfg_option_value(p.options, "temperature_step")) == "0.5"
       ? CLIMATE_DEFAULT_STEP_TENTHS
@@ -2751,6 +2771,15 @@ inline ClimateControlCtx *create_climate_control_context(
   ctx->card_icon_font = card_icon_font ? card_icon_font : icon_font;
   ctx->icon_font = icon_font;
   ctx->width_compensation_percent = normalize_width_compensation_percent(width_compensation_percent);
+  if (btn && !ctx->mode_icon_position.empty()) {
+    // A plain child of the card; the slot reset deletes it on rebuild.
+    ctx->mode_icon_lbl = lv_label_create(btn);
+    if (ctx->mode_icon_lbl) {
+      if (icon_font) lv_obj_set_style_text_font(ctx->mode_icon_lbl, icon_font, LV_PART_MAIN);
+      lv_obj_clear_flag(ctx->mode_icon_lbl, LV_OBJ_FLAG_CLICKABLE);
+      apply_icon_width_compensation(ctx->mode_icon_lbl);
+    }
+  }
   if (btn) lv_obj_set_user_data(btn, ctx);
   int &count = climate_control_ref_count();
   if (count < MAX_GRID_SLOTS + MAX_SUBPAGE_ITEMS) climate_control_refs()[count++] = ctx;

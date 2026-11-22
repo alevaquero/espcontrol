@@ -113,6 +113,11 @@ export function createWebStyles(dragAnimation: boolean): string {
         ".sp-sensor-preview{display:flex;align-items:baseline;gap:.18em;color:var(--card-text-color,var(--preview-text-primary))}" +
         ".sp-climate-temp-card .sp-sensor-preview{position:absolute;left:var(--btn-pad);top:var(--btn-pad)}" +
         ".sp-climate-temp-card .sp-btn-label-row{margin-top:auto}" +
+        ".sp-climate-mode-icon{position:absolute;font-size:var(--btn-icon);line-height:1;" +
+        "color:var(--card-text-color,var(--preview-text-primary));z-index:1;pointer-events:none}" +
+        ".sp-climate-mode-icon-center{left:50%;top:50%;transform:translate(-50%,-50%)}" +
+        ".sp-climate-mode-icon-top_right{right:var(--btn-pad);top:var(--btn-pad)}" +
+        ".sp-climate-mode-icon-bottom_right{right:var(--btn-pad);bottom:var(--btn-pad)}" +
         ".sp-btn-big .sp-sensor-preview-large .sp-sensor-value,.sp-btn-wide .sp-sensor-preview-large .sp-sensor-value{font-size:calc(var(--btn-icon)*2.5);font-weight:300}" +
         ".sp-btn-big .sp-sensor-preview-large .sp-sensor-unit,.sp-btn-wide .sp-sensor-preview-large .sp-sensor-unit{transform:translateY(var(--large-sensor-unit-offset-y,-20px))}" +
         ".sp-clock-large .sp-sensor-value{font-size:calc(var(--btn-icon)*2.5);font-family:Roboto,sans-serif;font-weight:300}" +
