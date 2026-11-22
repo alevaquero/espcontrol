@@ -67,6 +67,14 @@ def assert_no_secrets(paths: list[Path], yaml_path: Path) -> None:
             raise SystemExit(f"{path.name} contains a value from secrets.yaml; not publishing it")
 
 
+def assert_version(ota: Path, version: str) -> None:
+    # Local builds lack the dashboard import metadata that
+    # firmware_release.assert_binary_version also expects.
+    expected = f"Project {firmware_release.PROJECT_NAME} version {version}"
+    if expected not in firmware_release.printable_strings(ota):
+        raise SystemExit(f"{ota} does not contain firmware version {version}")
+
+
 def write_manifest(slug: str, version: str, ota: Path, out: Path) -> None:
     data = {
         "name": "Espcontrol",
@@ -127,7 +135,7 @@ def main() -> int:
         compile_firmware(yaml_path, args.version)
     build_dir = newest_build_dir(yaml_path)
     ota = build_dir / "firmware.ota.bin"
-    firmware_release.assert_binary_version(ota, args.version)
+    assert_version(ota, args.version)
     assert_no_secrets([ota, build_dir / "firmware.factory.bin"], yaml_path)
     publish(slug, args.version, build_dir, args.remote, not args.no_push)
     return 0
