@@ -164,7 +164,7 @@ function registerCards(context: ApplicationContext) {
     fields,
   );
   registerClockCardTypes(registry, context.configuration.dateTimeOptions, fields);
-  registerDoorWindowCardTypes(registry, context.configuration.options, fields);
+  registerDoorWindowCardTypes(registry, context.configuration.options, fields, cardUi);
   registerFanCardTypes(registry, context.configuration.modalTabs, fields, cardUi);
   registerGarageCardTypes(
     coverLikeCards.register,

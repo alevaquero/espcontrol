@@ -131,6 +131,13 @@ export function createWebStyles(dragAnimation: boolean): string {
         ".sp-weather-current-temperature-top{top:var(--btn-pad);display:flex;align-items:baseline;gap:.18em}" +
         ".sp-weather-current-temperature-bottom{bottom:var(--btn-pad);font-size:var(--btn-label);line-height:1.2}" +
         ".sp-weather-current-bottom-temperature .sp-btn-label-row,.sp-weather-current-bottom-temperature>.sp-btn-label{padding-right:3em}" +
+        ".sp-door-window-half{position:absolute;top:0;bottom:0;width:50%;z-index:0}" +
+        ".sp-door-window-half-right{right:0;border-radius:0 var(--btn-r) var(--btn-r) 0}" +
+        ".sp-door-window-right-lit .sp-door-window-half-right{background:var(--card-active-color)}" +
+        ".sp-door-window-icon2{position:absolute;right:var(--btn-pad);top:var(--btn-pad);font-size:var(--btn-icon);line-height:1;z-index:1}" +
+        ".sp-door-window-labels{display:flex;gap:6px;position:relative;z-index:1}" +
+        ".sp-door-window-labels>.sp-btn-label{flex:1 1 0;min-width:0}" +
+        ".sp-door-window-label2{text-align:right}" +
         ".sp-sensor-unit{font-size:var(--btn-label);line-height:1;color:var(--card-text-color,var(--preview-text-primary))}" +
         ".sp-slider-preview{position:absolute;inset:0;border-radius:var(--r);overflow:hidden;pointer-events:none}" +
         ".sp-slider-track{display:block;width:100%;height:100%;position:relative}" +

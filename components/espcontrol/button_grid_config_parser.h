@@ -868,8 +868,37 @@ inline const char *door_window_open_icon_name(const std::string &subtype) {
   return normalize_door_window_subtype(subtype) == "window" ? "Window Open" : "Door Open";
 }
 
+// A Doors & Windows card shows its own sensor on the left, a second sensor on
+// the right, or both side by side. The right sensor has its own label,
+// door/window subtype, icons, and Lit When Open setting.
+inline std::string normalize_door_window_sides(const std::string &options) {
+  const std::string sides = cfg_option_value(options, "sides");
+  if (sides == "right" || sides == "both" || sides == "left") return sides;
+  // Cards saved before the side choice existed split when a second sensor is set.
+  return cfg_option_value(options, "sensor2").empty() ? "left" : "both";
+}
+
 inline std::string door_window_card_options_normalized(const std::string &options) {
-  return cfg_option_token_present(options, "active_color") ? "active_color" : "";
+  std::string out = cfg_option_token_present(options, "active_color") ? "active_color" : "";
+  const std::string sides = normalize_door_window_sides(options);
+  if (sides == "left") return out;
+  auto append = [&out](const std::string &part) {
+    if (!out.empty()) out += ",";
+    out += part;
+  };
+  // "Auto" icons follow the right subtype, so they are not stored.
+  auto append_value = [&append, &options](const char *key, bool icon = false) {
+    const std::string value = cfg_option_value(options, key);
+    if (!value.empty() && !(icon && value == "Auto")) append(std::string(key) + "=" + encode_compact_field(value));
+  };
+  append("sides=" + sides);
+  append_value("sensor2");
+  append_value("label2");
+  if (cfg_option_value(options, "subtype2") == "window") append("subtype2=window");
+  append_value("icon2", true);
+  append_value("icon_on2", true);
+  if (cfg_option_token_present(options, "active_color2")) append("active_color2");
+  return out;
 }
 
 inline std::string presence_card_options_normalized(const std::string &options) {

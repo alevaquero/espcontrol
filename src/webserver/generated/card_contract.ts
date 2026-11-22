@@ -1520,6 +1520,63 @@ export const CARD_CONTRACT_CARDS: Readonly<Record<string, CardTypeSpec>> = {
         "label": "Lit When Open",
         "kind": "flag",
         "omitDefault": true
+      },
+      {
+        "name": "sides",
+        "label": "Show",
+        "kind": "choice",
+        "values": [
+          "left",
+          "right",
+          "both"
+        ],
+        "defaultValue": "left",
+        "omitDefault": true
+      },
+      {
+        "name": "sensor2",
+        "label": "Right Sensor Entity",
+        "kind": "text",
+        "defaultValue": "",
+        "omitDefault": true
+      },
+      {
+        "name": "label2",
+        "label": "Right Label",
+        "kind": "text",
+        "defaultValue": "",
+        "omitDefault": true
+      },
+      {
+        "name": "subtype2",
+        "label": "Right Type",
+        "kind": "choice",
+        "values": [
+          "door",
+          "window"
+        ],
+        "defaultValue": "door",
+        "omitDefault": true
+      },
+      {
+        "name": "icon2",
+        "label": "Right Closed Icon",
+        "kind": "text",
+        "defaultValue": "",
+        "omitDefault": true
+      },
+      {
+        "name": "icon_on2",
+        "label": "Right Open Icon",
+        "kind": "text",
+        "defaultValue": "",
+        "omitDefault": true
+      },
+      {
+        "name": "active_color2",
+        "label": "Right Lit When Open",
+        "kind": "flag",
+        "omitDefault": true
       }
     ],
     "normalization": {
@@ -1559,7 +1616,14 @@ export const CARD_CONTRACT_CARDS: Readonly<Record<string, CardTypeSpec>> = {
       },
       "unknownOptions": "drop",
       "canonicalOptionOrder": [
-        "active_color"
+        "active_color",
+        "sides",
+        "sensor2",
+        "label2",
+        "subtype2",
+        "icon2",
+        "icon_on2",
+        "active_color2"
       ],
       "optionHook": "normalize_occupancy_options"
     },
@@ -4936,6 +5000,7 @@ export const CARD_CONTRACT_LARGE_NUMBERS: Readonly<Record<string, LargeNumbersRu
 export const CARD_CONTRACT_OPTION_NAMES: Readonly<Record<string, string>> = {
   "actions": "actions",
   "active_color": "active_color",
+  "active_color2": "active_color2",
   "alarm_card_type": "alarm_card_type",
   "center_clock": "center_clock",
   "climate_tabs": "climate_tabs",
@@ -4958,7 +5023,9 @@ export const CARD_CONTRACT_OPTION_NAMES: Readonly<Record<string, string>> = {
   "garage_mode": "garage_mode",
   "gate_mode": "gate_mode",
   "hidden": "hidden",
+  "icon2": "icon2",
   "icon_display": "icon_display",
+  "icon_on2": "icon_on2",
   "image_icon": "image_icon",
   "image_label": "image_label",
   "image_modal_mode": "image_modal_mode",
@@ -4966,6 +5033,7 @@ export const CARD_CONTRACT_OPTION_NAMES: Readonly<Record<string, string>> = {
   "image_modal_refresh_mode": "image_modal_refresh_mode",
   "image_modal_refresh_trigger": "image_modal_refresh_trigger",
   "internal_mode": "internal_mode",
+  "label2": "label2",
   "label_display": "label_display",
   "large_numbers": "large_numbers",
   "lawn_mower_mode": "lawn_mower_mode",
@@ -4989,6 +5057,8 @@ export const CARD_CONTRACT_OPTION_NAMES: Readonly<Record<string, string>> = {
   "screensaver_on_lock": "screensaver_on_lock",
   "script_fields": "script_fields",
   "security": "security",
+  "sensor2": "sensor2",
+  "sides": "sides",
   "speaker_group_entity": "speaker_group_entity",
   "ssid64": "ssid64",
   "state_entity": "state_entity",
@@ -5002,6 +5072,7 @@ export const CARD_CONTRACT_OPTION_NAMES: Readonly<Record<string, string>> = {
   "state_precision": "state_precision",
   "state_unit": "state_unit",
   "subpage_kind": "subpage_kind",
+  "subtype2": "subtype2",
   "temperature_step": "temperature_step",
   "time_unit": "time_unit",
   "vacuum_mode": "vacuum_mode",
