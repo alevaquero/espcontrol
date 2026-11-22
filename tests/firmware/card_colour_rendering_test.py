@@ -94,6 +94,8 @@ void set_wrapped_button_label_text(lv_obj_t *label, const std::string &text) { l
 namespace espcontrol::cards {
 const char *status_entity_driver_inactive_icon(const ParsedCfg &, const Context &) { return "off"; }
 const char *status_entity_driver_active_icon(const ParsedCfg &, const Context &) { return "on"; }
+bool door_window_has_second_sensor(const ParsedCfg &, const Context &) { return false; }
+void status_entity_driver_bind_split(BtnSlot &, const ParsedCfg &, const CardPalette &) {}
 }
 struct ImageCardCtx { bool artwork_visible = false; };
 struct MediaNowPlayingCtx {
