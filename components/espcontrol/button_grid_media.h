@@ -421,6 +421,7 @@ inline void media_control_speaker_action_timer_cb(lv_timer_t *timer);
 inline void media_control_refresh_power(MediaControlCtx *ctx);
 inline void media_control_refresh_playback_modes(MediaControlCtx *ctx);
 inline void media_control_ensure_tab_content(MediaControlCtx *ctx);
+inline void media_control_create_controls_extras(MediaControlCtx *ctx);
 inline void media_control_clear_tab_content();
 inline void media_control_select_tab(MediaControlTab tab);
 inline void media_control_create_library_tab_content(MediaControlCtx *ctx);
