@@ -10,10 +10,10 @@
   },
   "summary": {
     "deviceProfiles": 10,
-    "cardTypes": 44,
+    "cardTypes": 45,
     "entityNames": 112,
     "icons": 371,
-    "structuralIcons": 28,
+    "structuralIcons": 34,
     "compatibilityFixtureGroups": 2
   },
   "deviceProfiles": {
@@ -2138,7 +2138,8 @@
         "weather",
         "image",
         "wifi_qr",
-        "timer"
+        "timer",
+        "remote"
       ],
       "capabilities": [
         "informationOnly",
@@ -2701,6 +2702,18 @@
             "numericControl": false,
             "modal": true,
             "runtimeAllocation": true,
+            "subpage": true
+          }
+        },
+        "remote": {
+          "driver": "remote",
+          "capabilities": {
+            "informationOnly": false,
+            "subscriptions": true,
+            "actions": true,
+            "numericControl": false,
+            "modal": true,
+            "runtimeAllocation": false,
             "subpage": true
           }
         }
@@ -6880,6 +6893,185 @@
           "precision": "tomorrow",
           "options": ""
         }
+      },
+      "remote": {
+        "label": "Remote",
+        "allowInSubpage": true,
+        "domains": [
+          "remote"
+        ],
+        "options": [
+          {
+            "name": "up",
+            "label": "Up",
+            "kind": "text",
+            "omitDefault": true
+          },
+          {
+            "name": "dn",
+            "label": "Down",
+            "kind": "text",
+            "omitDefault": true
+          },
+          {
+            "name": "lt",
+            "label": "Left",
+            "kind": "text",
+            "omitDefault": true
+          },
+          {
+            "name": "rt",
+            "label": "Right",
+            "kind": "text",
+            "omitDefault": true
+          },
+          {
+            "name": "ok",
+            "label": "OK",
+            "kind": "text",
+            "omitDefault": true
+          },
+          {
+            "name": "bk",
+            "label": "Back",
+            "kind": "text",
+            "omitDefault": true
+          },
+          {
+            "name": "hm",
+            "label": "Home",
+            "kind": "text",
+            "omitDefault": true
+          },
+          {
+            "name": "mn",
+            "label": "Menu",
+            "kind": "text",
+            "omitDefault": true
+          },
+          {
+            "name": "vu",
+            "label": "Volume Up",
+            "kind": "text",
+            "omitDefault": true
+          },
+          {
+            "name": "vd",
+            "label": "Volume Down",
+            "kind": "text",
+            "omitDefault": true
+          },
+          {
+            "name": "mt",
+            "label": "Mute",
+            "kind": "text",
+            "omitDefault": true
+          },
+          {
+            "name": "pw",
+            "label": "Power",
+            "kind": "text",
+            "omitDefault": true
+          },
+          {
+            "name": "pp",
+            "label": "Play/Pause",
+            "kind": "text",
+            "omitDefault": true
+          },
+          {
+            "name": "rw",
+            "label": "Rewind",
+            "kind": "text",
+            "omitDefault": true
+          },
+          {
+            "name": "ff",
+            "label": "Fast Forward",
+            "kind": "text",
+            "omitDefault": true
+          },
+          {
+            "name": "ro",
+            "label": "Button Order",
+            "kind": "text",
+            "values": [
+              "bk",
+              "hm",
+              "mn",
+              "rw",
+              "pp",
+              "ff",
+              "pw"
+            ],
+            "defaultValue": "bk|hm|mn|rw|pp|ff|pw",
+            "omitDefault": true
+          }
+        ],
+        "normalization": {
+          "fields": {
+            "entity": {
+              "policy": "keep"
+            },
+            "label": {
+              "policy": "keep"
+            },
+            "icon": {
+              "policy": "default",
+              "value": "Auto"
+            },
+            "icon_on": {
+              "policy": "default",
+              "value": "Auto"
+            },
+            "sensor": {
+              "policy": "clear"
+            },
+            "unit": {
+              "policy": "clear"
+            },
+            "type": {
+              "policy": "default",
+              "value": "remote"
+            },
+            "precision": {
+              "policy": "clear"
+            },
+            "options": {
+              "policy": "keep"
+            }
+          },
+          "unknownOptions": "drop",
+          "canonicalOptionOrder": [
+            "up",
+            "dn",
+            "lt",
+            "rt",
+            "ok",
+            "bk",
+            "hm",
+            "mn",
+            "vu",
+            "vd",
+            "mt",
+            "pw",
+            "pp",
+            "rw",
+            "ff",
+            "ro"
+          ]
+        },
+        "default": {
+          "entity": "",
+          "label": "",
+          "icon": "Auto",
+          "icon_on": "Auto",
+          "sensor": "",
+          "unit": "",
+          "type": "remote",
+          "precision": "",
+          "options": "up=up,dn=down,lt=left,rt=right,ok=select,bk=menu,hm=home,vu=volume_up,vd=volume_down,pw=suspend"
+        }
       }
     },
     "migrationActions": {
@@ -7159,7 +7351,8 @@
       "screensaver": "SS",
       "webhook": "WH",
       "internal": "I",
-      "subpage": "G"
+      "subpage": "G",
+      "remote": "RM"
     }
   },
   "entityNames": {
@@ -8544,6 +8737,42 @@
         "name": "Wind arrow-top-left",
         "codepoint": "F005B",
         "mdi": "arrow-top-left"
+      },
+      {
+        "name": "Volume Plus",
+        "codepoint": "F075D",
+        "mdi": "volume-plus",
+        "comment": "Remote card modal button"
+      },
+      {
+        "name": "Volume Minus",
+        "codepoint": "F075E",
+        "mdi": "volume-minus",
+        "comment": "Remote card modal button"
+      },
+      {
+        "name": "Volume Mute",
+        "codepoint": "F075F",
+        "mdi": "volume-mute",
+        "comment": "Remote card modal button"
+      },
+      {
+        "name": "Menu",
+        "codepoint": "F035C",
+        "mdi": "menu",
+        "comment": "Remote card modal button"
+      },
+      {
+        "name": "Rewind",
+        "codepoint": "F045F",
+        "mdi": "rewind",
+        "comment": "Remote card modal button"
+      },
+      {
+        "name": "Fast Forward",
+        "codepoint": "F0211",
+        "mdi": "fast-forward",
+        "comment": "Remote card modal button"
       }
     ],
     "icons": [
@@ -10413,7 +10642,8 @@
       "media_player": "Speaker",
       "camera": "Camera",
       "button": "Gesture Tap",
-      "binary_sensor": "Motion Sensor"
+      "binary_sensor": "Motion Sensor",
+      "remote": "Remote TV"
     }
   },
   "compatibilityFixtures": {

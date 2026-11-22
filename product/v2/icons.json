@@ -166,6 +166,42 @@
       "name": "Wind arrow-top-left",
       "codepoint": "F005B",
       "mdi": "arrow-top-left"
+    },
+    {
+      "name": "Volume Plus",
+      "codepoint": "F075D",
+      "mdi": "volume-plus",
+      "comment": "Remote card modal button"
+    },
+    {
+      "name": "Volume Minus",
+      "codepoint": "F075E",
+      "mdi": "volume-minus",
+      "comment": "Remote card modal button"
+    },
+    {
+      "name": "Volume Mute",
+      "codepoint": "F075F",
+      "mdi": "volume-mute",
+      "comment": "Remote card modal button"
+    },
+    {
+      "name": "Menu",
+      "codepoint": "F035C",
+      "mdi": "menu",
+      "comment": "Remote card modal button"
+    },
+    {
+      "name": "Rewind",
+      "codepoint": "F045F",
+      "mdi": "rewind",
+      "comment": "Remote card modal button"
+    },
+    {
+      "name": "Fast Forward",
+      "codepoint": "F0211",
+      "mdi": "fast-forward",
+      "comment": "Remote card modal button"
     }
   ],
   "icons": [
@@ -2035,6 +2071,7 @@
     "media_player": "Speaker",
     "camera": "Camera",
     "button": "Gesture Tap",
-    "binary_sensor": "Motion Sensor"
+    "binary_sensor": "Motion Sensor",
+    "remote": "Remote TV"
   }
 }

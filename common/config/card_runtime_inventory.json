@@ -3,7 +3,7 @@
   "lifecycleVocabulary": {
     "subscriptions": ["none", "state", "attributes", "local", "time", "action_response", "http"],
     "actions": ["none", "home_assistant_service", "local", "http", "navigation", "modal"],
-    "modalOwners": ["none", "alarm", "climate", "cover", "image", "media", "wifi_qr", "weather"]
+    "modalOwners": ["none", "alarm", "climate", "cover", "image", "media", "wifi_qr", "weather", "remote"]
   },
   "types": {
     "timer": {
@@ -297,6 +297,14 @@
       "classification": "canonical", "canonicalType": "screen_lock", "webRegistration": "screen_lock", "firmwareFamily": "SCREEN_LOCK",
       "lifecycle": { "subscriptions": ["local"], "actions": ["local"], "modalOwner": "none" },
       "modes": [{ "name": "toggle", "config": {} }]
+    },
+    "remote": {
+      "classification": "canonical",
+      "canonicalType": "remote",
+      "webRegistration": "remote",
+      "firmwareFamily": "REMOTE",
+      "lifecycle": { "subscriptions": ["state"], "actions": ["modal", "home_assistant_service"], "modalOwner": "remote" },
+      "modes": [{ "name": "remote", "config": { "type": "remote", "entity": "remote.living_room", "options": "up=up,dn=down,lt=left,rt=right,ok=select,bk=menu,hm=home" } }]
     },
     "webhook": {
       "classification": "canonical", "canonicalType": "webhook", "webRegistration": "webhook", "firmwareFamily": "WEBHOOK",

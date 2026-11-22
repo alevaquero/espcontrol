@@ -4334,6 +4334,185 @@ export const CARD_CONTRACT_CARDS: Readonly<Record<string, CardTypeSpec>> = {
       "precision": "tomorrow",
       "options": ""
     }
+  },
+  "remote": {
+    "label": "Remote",
+    "allowInSubpage": true,
+    "domains": [
+      "remote"
+    ],
+    "options": [
+      {
+        "name": "up",
+        "label": "Up",
+        "kind": "text",
+        "omitDefault": true
+      },
+      {
+        "name": "dn",
+        "label": "Down",
+        "kind": "text",
+        "omitDefault": true
+      },
+      {
+        "name": "lt",
+        "label": "Left",
+        "kind": "text",
+        "omitDefault": true
+      },
+      {
+        "name": "rt",
+        "label": "Right",
+        "kind": "text",
+        "omitDefault": true
+      },
+      {
+        "name": "ok",
+        "label": "OK",
+        "kind": "text",
+        "omitDefault": true
+      },
+      {
+        "name": "bk",
+        "label": "Back",
+        "kind": "text",
+        "omitDefault": true
+      },
+      {
+        "name": "hm",
+        "label": "Home",
+        "kind": "text",
+        "omitDefault": true
+      },
+      {
+        "name": "mn",
+        "label": "Menu",
+        "kind": "text",
+        "omitDefault": true
+      },
+      {
+        "name": "vu",
+        "label": "Volume Up",
+        "kind": "text",
+        "omitDefault": true
+      },
+      {
+        "name": "vd",
+        "label": "Volume Down",
+        "kind": "text",
+        "omitDefault": true
+      },
+      {
+        "name": "mt",
+        "label": "Mute",
+        "kind": "text",
+        "omitDefault": true
+      },
+      {
+        "name": "pw",
+        "label": "Power",
+        "kind": "text",
+        "omitDefault": true
+      },
+      {
+        "name": "pp",
+        "label": "Play/Pause",
+        "kind": "text",
+        "omitDefault": true
+      },
+      {
+        "name": "rw",
+        "label": "Rewind",
+        "kind": "text",
+        "omitDefault": true
+      },
+      {
+        "name": "ff",
+        "label": "Fast Forward",
+        "kind": "text",
+        "omitDefault": true
+      },
+      {
+        "name": "ro",
+        "label": "Button Order",
+        "kind": "text",
+        "values": [
+          "bk",
+          "hm",
+          "mn",
+          "rw",
+          "pp",
+          "ff",
+          "pw"
+        ],
+        "defaultValue": "bk|hm|mn|rw|pp|ff|pw",
+        "omitDefault": true
+      }
+    ],
+    "normalization": {
+      "fields": {
+        "entity": {
+          "policy": "keep"
+        },
+        "label": {
+          "policy": "keep"
+        },
+        "icon": {
+          "policy": "default",
+          "value": "Auto"
+        },
+        "icon_on": {
+          "policy": "default",
+          "value": "Auto"
+        },
+        "sensor": {
+          "policy": "clear"
+        },
+        "unit": {
+          "policy": "clear"
+        },
+        "type": {
+          "policy": "default",
+          "value": "remote"
+        },
+        "precision": {
+          "policy": "clear"
+        },
+        "options": {
+          "policy": "keep"
+        }
+      },
+      "unknownOptions": "drop",
+      "canonicalOptionOrder": [
+        "up",
+        "dn",
+        "lt",
+        "rt",
+        "ok",
+        "bk",
+        "hm",
+        "mn",
+        "vu",
+        "vd",
+        "mt",
+        "pw",
+        "pp",
+        "rw",
+        "ff",
+        "ro"
+      ]
+    },
+    "default": {
+      "entity": "",
+      "label": "",
+      "icon": "Auto",
+      "icon_on": "Auto",
+      "sensor": "",
+      "unit": "",
+      "type": "remote",
+      "precision": "",
+      "options": "up=up,dn=down,lt=left,rt=right,ok=select,bk=menu,hm=home,vu=volume_up,vd=volume_down,pw=suspend"
+    }
   }
 };
 export const CARD_RUNTIME_SPECS: Readonly<Record<string, CardRuntimeSpec>> = {
@@ -4890,6 +5069,18 @@ export const CARD_RUNTIME_SPECS: Readonly<Record<string, CardRuntimeSpec>> = {
       "runtimeAllocation": true,
       "subpage": true
     }
+  },
+  "remote": {
+    "driver": "remote",
+    "capabilities": {
+      "informationOnly": false,
+      "subscriptions": true,
+      "actions": true,
+      "numericControl": false,
+      "modal": true,
+      "runtimeAllocation": false,
+      "subpage": true
+    }
   }
 };
 export const CARD_CONTRACT_MIGRATION_ALIASES: Readonly<Record<string, Partial<CardConfig>>> = {
@@ -4964,7 +5155,8 @@ export const CARD_CONTRACT_SUBPAGE_TYPE_CODES: Readonly<Record<string, string>> 
   "screensaver": "SS",
   "webhook": "WH",
   "internal": "I",
-  "subpage": "G"
+  "subpage": "G",
+  "remote": "RM"
 };
 export const CARD_CONTRACT_SUBPAGE_TYPES_BY_CODE: Readonly<Record<string, string>> = {
   "TM": "timer",
@@ -5006,7 +5198,8 @@ export const CARD_CONTRACT_SUBPAGE_TYPES_BY_CODE: Readonly<Record<string, string
   "SS": "screensaver",
   "WH": "webhook",
   "I": "internal",
-  "G": "subpage"
+  "G": "subpage",
+  "RM": "remote"
 };
 export const CARD_CONTRACT_LARGE_NUMBERS: Readonly<Record<string, LargeNumbersRule>> = {
   "": true,
@@ -5030,6 +5223,7 @@ export const CARD_CONTRACT_OPTION_NAMES: Readonly<Record<string, string>> = {
   "active_color": "active_color",
   "active_color2": "active_color2",
   "alarm_card_type": "alarm_card_type",
+  "bk": "bk",
   "center_clock": "center_clock",
   "climate_tabs": "climate_tabs",
   "confirm_message": "confirm_message",
@@ -5046,11 +5240,14 @@ export const CARD_CONTRACT_OPTION_NAMES: Readonly<Record<string, string>> = {
   "cover_tabs": "cover_tabs",
   "current_temperature": "current_temperature",
   "date_time_mode": "date_time_mode",
+  "dn": "dn",
   "fan_light_entity": "fan_light_entity",
   "fan_tabs": "fan_tabs",
+  "ff": "ff",
   "garage_mode": "garage_mode",
   "gate_mode": "gate_mode",
   "hidden": "hidden",
+  "hm": "hm",
   "icon2": "icon2",
   "icon_display": "icon_display",
   "icon_on2": "icon_on2",
@@ -5067,13 +5264,17 @@ export const CARD_CONTRACT_OPTION_NAMES: Readonly<Record<string, string>> = {
   "lawn_mower_mode": "lawn_mower_mode",
   "light_tabs": "light_tabs",
   "lock_mode": "lock_mode",
+  "lt": "lt",
   "media_cover_art": "media_cover_art",
   "media_display": "media_display",
   "media_mode": "media_mode",
   "media_now_playing_controls": "media_now_playing_controls",
   "media_tabs": "media_tabs",
+  "mn": "mn",
   "mode_icon": "mode_icon",
+  "mt": "mt",
   "number_display": "number_display",
+  "ok": "ok",
   "on_pattern": "on_pattern",
   "pass64": "pass64",
   "pin_arm": "pin_arm",
@@ -5082,7 +5283,12 @@ export const CARD_CONTRACT_OPTION_NAMES: Readonly<Record<string, string>> = {
   "playlist_content_type": "playlist_content_type",
   "playlist_player_source": "playlist_player_source",
   "power_entity": "power_entity",
+  "pp": "pp",
+  "pw": "pw",
   "rainfall_source": "rainfall_source",
+  "ro": "ro",
+  "rt": "rt",
+  "rw": "rw",
   "screensaver_on_lock": "screensaver_on_lock",
   "script_fields": "script_fields",
   "security": "security",
@@ -5104,8 +5310,11 @@ export const CARD_CONTRACT_OPTION_NAMES: Readonly<Record<string, string>> = {
   "subtype2": "subtype2",
   "temperature_step": "temperature_step",
   "time_unit": "time_unit",
+  "up": "up",
   "vacuum_mode": "vacuum_mode",
+  "vd": "vd",
   "volume_max": "volume_max",
+  "vu": "vu",
   "weather_mode": "weather_mode",
   "webhook_headers": "webhook_headers",
   "wifi_tabs": "wifi_tabs",

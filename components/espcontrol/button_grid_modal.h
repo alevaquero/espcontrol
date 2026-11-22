@@ -61,6 +61,7 @@ inline ControlModalDefinition control_modal_definition(ControlModalKind kind) {
       return {ControlModalPresentation::STATUS, ControlModalChrome::CLOSE,
               ControlModalDismissPolicy::DISMISS};
     case ControlModalKind::ALARM_PIN:
+    case ControlModalKind::REMOTE_CONTROL:
       return {ControlModalPresentation::KEYPAD, ControlModalChrome::BACK,
               ControlModalDismissPolicy::DISMISS};
     case ControlModalKind::ALARM_CONTROL:

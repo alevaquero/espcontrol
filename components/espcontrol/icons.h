@@ -45,6 +45,12 @@ static const IconEntry ICON_ENTRIES[] = {
     {"Wind arrow-bottom-left",             "\U000F0042"},
     {"Wind arrow-left",                    "\U000F004D"},
     {"Wind arrow-top-left",                "\U000F005B"},
+    {"Volume Plus",                        "\U000F075D"},
+    {"Volume Minus",                       "\U000F075E"},
+    {"Volume Mute",                        "\U000F075F"},
+    {"Menu",                               "\U000F035C"},
+    {"Rewind",                             "\U000F045F"},
+    {"Fast Forward",                       "\U000F0211"},
     {"Chevron Left",                       "\U000F0141"},
     {"Chevron Right",                      "\U000F0142"},
     {"Account",                            "\U000F0004"},
@@ -458,6 +464,7 @@ inline const char* domain_default_icon(const std::string &domain) {
   if (domain == "camera")                     return "\U000F0100";  // Camera
   if (domain == "button")                     return "\U000F0741";  // Gesture Tap
   if (domain == "binary_sensor")              return "\U000F0D91";  // Motion Sensor
+  if (domain == "remote")                     return "\U000F0EC5";  // Remote TV
   // --- GENERATED:DOMAIN_ICONS END ---
   return "\U000F0493";
 }

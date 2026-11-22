@@ -1080,6 +1080,21 @@
     }
   },
   {
+    "name": "remote: remote",
+    "input": "~remote.living_room,,Auto,Auto,,,remote,,up%3Dup%2Cdn%3Ddown%2Clt%3Dleft%2Crt%3Dright%2Cok%3Dselect%2Cbk%3Dmenu%2Chm%3Dhome",
+    "expected": {
+      "entity": "remote.living_room",
+      "label": "",
+      "icon": "Auto",
+      "icon_on": "Auto",
+      "sensor": "",
+      "unit": "",
+      "type": "remote",
+      "precision": "",
+      "options": "up=up,dn=down,lt=left,rt=right,ok=select,bk=menu,hm=home"
+    }
+  },
+  {
     "name": "webhook: get",
     "input": "~https%3A%2F%2Fexample.invalid%2Fhook,,Auto,Auto,GET,,webhook,,",
     "expected": {

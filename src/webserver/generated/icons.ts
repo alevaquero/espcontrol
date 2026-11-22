@@ -120,5 +120,6 @@ export const GENERATED_DOMAIN_ICONS: Readonly<Record<string, string>> = {
   camera: "camera",
   button: "gesture-tap",
   binary_sensor: "motion-sensor",
+  remote: "remote-tv",
 };
 // --- GENERATED:DOMAIN_ICONS END ---
