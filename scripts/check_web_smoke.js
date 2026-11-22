@@ -1641,7 +1641,7 @@ const publicManifest = {
 assert.deepStrictEqual(plain(hooks.firmwareInfoFromPublicManifest(publicManifest)), {
   latest_version: "v1.12.0",
   release_url: "https://github.com/jtenniswood/espcontrol/releases/tag/v1.12.0",
-  ota_url: "https://jtenniswood.github.io/espcontrol/firmware/guition-esp32-p4-jc1060p470/guition-esp32-p4-jc1060p470.ota.bin",
+  ota_url: "https://raw.githubusercontent.com/alevaquero/espcontrol/firmware/guition-esp32-p4-jc1060p470/guition-esp32-p4-jc1060p470.ota.bin",
   ota_filename: "guition-esp32-p4-jc1060p470.ota.bin",
   ota_md5: "0123456789abcdef0123456789abcdef",
 });
@@ -1673,13 +1673,13 @@ const publicVersionIndex = {
 assert.deepStrictEqual(plain(hooks.firmwareInfosFromPublicVersions(publicVersionIndex)), [{
   latest_version: "v1.12.0",
   release_url: "https://github.com/jtenniswood/espcontrol/releases/tag/v1.12.0",
-  ota_url: "https://jtenniswood.github.io/espcontrol/firmware/guition-esp32-p4-jc1060p470/guition-esp32-p4-jc1060p470.ota.bin",
+  ota_url: "https://raw.githubusercontent.com/alevaquero/espcontrol/firmware/guition-esp32-p4-jc1060p470/guition-esp32-p4-jc1060p470.ota.bin",
   ota_filename: "guition-esp32-p4-jc1060p470.ota.bin",
   ota_md5: "0123456789abcdef0123456789abcdef",
 }, {
   latest_version: "v1.11.0",
   release_url: "https://github.com/jtenniswood/espcontrol/releases/tag/v1.11.0",
-  ota_url: "https://jtenniswood.github.io/espcontrol/firmware/guition-esp32-p4-jc1060p470/versions/v1.11.0/guition-esp32-p4-jc1060p470.ota.bin",
+  ota_url: "https://raw.githubusercontent.com/alevaquero/espcontrol/firmware/guition-esp32-p4-jc1060p470/versions/v1.11.0/guition-esp32-p4-jc1060p470.ota.bin",
   ota_filename: "guition-esp32-p4-jc1060p470.ota.bin",
   ota_md5: "abcdef0123456789abcdef0123456789",
 }]);
@@ -1701,7 +1701,7 @@ assert.deepStrictEqual(plain(hooks.firmwareStateAfterVersionIndex("v1.12.0", pub
 });
 assert.strictEqual(
   hooks.firmwareOtaUrlAfterVersionIndex("v1.12.0", publicVersionIndex, "v1.11.0"),
-  "https://jtenniswood.github.io/espcontrol/firmware/guition-esp32-p4-jc1060p470/guition-esp32-p4-jc1060p470.ota.bin",
+  "https://raw.githubusercontent.com/alevaquero/espcontrol/firmware/guition-esp32-p4-jc1060p470/guition-esp32-p4-jc1060p470.ota.bin",
   "latest firmware OTA resolution must not follow the selected previous version"
 );
 assert.strictEqual(hooks.firmwareVersionLabelFor("", true), "Checking version...");
