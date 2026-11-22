@@ -70,6 +70,10 @@ ColorBitness = display.display_ns.enum("ColorBitness")
 
 CONF_LANE_BIT_RATE = "lane_bit_rate"
 CONF_LANES = "lanes"
+# Copy each draw into the frame buffer with DMA2D (the default) or the CPU.
+CONF_DMA2D_FRAME_COPY = "dma2d_frame_copy"
+# Rotate in this driver (PPA with a time limit) instead of in LVGL.
+CONF_ROTATE_IN_DRIVER = "rotate_in_driver"
 
 DsiDriverChip("CUSTOM")
 
@@ -126,6 +130,8 @@ def model_schema(config: ConfigType) -> cv.All:
                 cv.frequency, cv.Range(min=4e6, max=100e6)
             ),
             model.option(CONF_LANES, 2): cv.int_range(1, 2),
+            cv.Optional(CONF_DMA2D_FRAME_COPY, default=True): cv.boolean,
+            cv.Optional(CONF_ROTATE_IN_DRIVER, default=False): cv.boolean,
             model.option(CONF_LANE_BIT_RATE, None): cv.All(
                 cv.bps, cv.Range(min=100e6, max=3200e6)
             ),
@@ -166,7 +172,7 @@ def _config_schema(config: ConfigType) -> ConfigType:
         config[CONF_ID],
         width,
         height,
-        has_hardware_rotation=False,
+        has_hardware_rotation=config.get(CONF_ROTATE_IN_DRIVER, False),
         byte_order=config[CONF_BYTE_ORDER],
         has_writer=requires_buffer(config)
         or config.get(CONF_AUTO_CLEAR_ENABLED) is True,
@@ -211,6 +217,8 @@ async def to_code(config: ConfigType) -> None:
     cg.add(var.set_vsync_front_porch(config[CONF_VSYNC_FRONT_PORCH]))
     cg.add(var.set_pclk_frequency(config[CONF_PCLK_FREQUENCY] / 1.0e6))
     cg.add(var.set_lanes(int(config[CONF_LANES])))
+    cg.add(var.set_dma2d_frame_copy(config[CONF_DMA2D_FRAME_COPY]))
+    cg.add(var.set_rotate_in_driver(config[CONF_ROTATE_IN_DRIVER]))
     cg.add(var.set_lane_bit_rate(config[CONF_LANE_BIT_RATE] / 1.0e6))
     if reset_pin := config.get(CONF_RESET_PIN):
         reset = await cg.gpio_pin_expression(reset_pin)

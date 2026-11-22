@@ -15,6 +15,9 @@
 #include "esp_lcd_panel_io.h"
 
 #include "esp_lcd_mipi_dsi.h"
+#include "driver/ppa.h"
+
+#include "dsi_rotation.h"
 
 namespace esphome::mipi_dsi {
 
@@ -59,6 +62,8 @@ class MipiDsi final : public display::Display {
   void set_model(const char *model) { this->model_ = model; }
   void set_lane_bit_rate(float lane_bit_rate) { this->lane_bit_rate_ = lane_bit_rate; }
   void set_lanes(uint8_t lanes) { this->lanes_ = lanes; }
+  void set_dma2d_frame_copy(bool enabled) { this->dma2d_frame_copy_ = enabled; }
+  void set_rotate_in_driver(bool enabled) { this->rotate_in_driver_ = enabled; }
 
   void smark_failed(const LogString *message, esp_err_t err);
 
@@ -105,6 +110,25 @@ class MipiDsi final : public display::Display {
   esp_lcd_dsi_bus_handle_t bus_handle_{};
   esp_lcd_panel_io_handle_t io_handle_{};
   SemaphoreHandle_t io_lock_{};
+  // Waits for the DMA2D copy of one draw to finish. Returns false if the
+  // completion never arrived, so a lost interrupt cannot hang the main loop.
+  bool wait_for_transfer_();
+  uint32_t transfer_timeouts_{0};
+  bool dma2d_frame_copy_{true};
+  // When LVGL leaves rotation to this driver, blocks are rotated here with
+  // the PPA under a time limit, falling back to the CPU if a job is lost.
+  bool rotate_in_driver_{false};
+  bool rotate_block_(const uint8_t *src, int w, int h, int rotation, const RotatedBlock &target,
+                     const uint8_t *&out);
+  bool ensure_rotation_buffers_();
+  uint8_t *rotate_buf_{nullptr};
+  // The panel's frame buffer; CPU rotation writes straight into it.
+  uint8_t *frame_buffer_{nullptr};
+  size_t rotate_buf_size_{0};
+  ppa_client_handle_t ppa_client_{nullptr};
+  SemaphoreHandle_t ppa_done_{nullptr};
+  bool ppa_usable_{true};
+  uint32_t ppa_timeouts_{0};
   uint8_t *buffer_{nullptr};
   uint16_t x_low_{1};
   uint16_t y_low_{1};

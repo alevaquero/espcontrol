@@ -19,6 +19,8 @@
 #if defined(USE_ESP_IDF) && defined(CONFIG_IDF_TARGET_ESP32P4)
 #include "driver/jpeg_decode.h"
 #include "driver/ppa.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #endif
 static const char *const TAG = "artwork_image.jpeg";
 
@@ -101,12 +103,37 @@ static ppa_client_handle_t p4_ppa_scaler() {
   return client;
 }
 
+static bool IRAM_ATTR p4_ppa_scale_done(ppa_client_handle_t, ppa_event_data_t *, void *user_data) {
+  BaseType_t woken = pdFALSE;
+  xSemaphoreGiveFromISR(static_cast<SemaphoreHandle_t>(user_data), &woken);
+  return woken == pdTRUE;
+}
+
+// The PPA has been seen to never finish a job, after which every later PPA
+// job waits behind it. A blocking call would then hang the main loop until
+// the task watchdog rebooted the panel, so wait a bounded time and use CPU
+// scaling once a job is lost.
+static constexpr uint32_t PPA_SCALE_TIMEOUT_MS = 200;
+static bool p4_ppa_scale_lost = false;
+
 static bool p4_scale_rgb565(const uint8_t *source, uint32_t source_stride_pixels,
                             uint32_t source_width, uint32_t source_height,
                             uint32_t target_width, uint32_t target_height,
                             uint8_t *&scaled, size_t &scaled_capacity) {
   ppa_client_handle_t client = p4_ppa_scaler();
-  if (client == nullptr || source == nullptr || target_width == 0 || target_height == 0) return false;
+  if (client == nullptr || p4_ppa_scale_lost || source == nullptr || target_width == 0 ||
+      target_height == 0)
+    return false;
+  static SemaphoreHandle_t done = nullptr;
+  if (done == nullptr) {
+    done = xSemaphoreCreateBinary();
+    ppa_event_callbacks_t callbacks{};
+    callbacks.on_trans_done = p4_ppa_scale_done;
+    if (done == nullptr || ppa_client_register_event_callbacks(client, &callbacks) != ESP_OK) {
+      p4_ppa_scale_lost = true;
+      return false;
+    }
+  }
   size_t target_size = static_cast<size_t>(target_width) * target_height * 2;
   static constexpr size_t PPA_BUFFER_ALIGNMENT = 64;
   size_t required_capacity =
@@ -149,10 +176,21 @@ static bool p4_scale_rgb565(const uint8_t *source, uint32_t source_stride_pixels
   config.rotation_angle = PPA_SRM_ROTATION_ANGLE_0;
   config.scale_x = static_cast<float>(plan.scale_units) / PPA_SCALE_FRACTIONAL_STEPS;
   config.scale_y = config.scale_x;
-  config.mode = PPA_TRANS_MODE_BLOCKING;
+  config.mode = PPA_TRANS_MODE_NON_BLOCKING;
+  config.user_data = done;
+  xSemaphoreTake(done, 0);  // drop any stale completion
   esp_err_t err = ppa_do_scale_rotate_mirror(client, &config);
   if (err != ESP_OK) {
     ESP_LOGW(TAG, "ESP32-P4 PPA scaling failed (error %d); using CPU scaling", err);
+    return false;
+  }
+  if (xSemaphoreTake(done, pdMS_TO_TICKS(PPA_SCALE_TIMEOUT_MS)) != pdTRUE) {
+    // The lost job may still write into this buffer, so leave it to the PPA.
+    p4_ppa_scale_lost = true;
+    scaled = nullptr;
+    scaled_capacity = 0;
+    ESP_LOGW(TAG, "ESP32-P4 PPA scaling did not finish within %u ms; using CPU scaling from now on",
+             (unsigned) PPA_SCALE_TIMEOUT_MS);
     return false;
   }
   return true;
