@@ -7,7 +7,7 @@ for online updates, so publishing only needs a git push, not GitHub Actions.
 
 Usage:
   ESPHOME_BIN=... python3 scripts/publish_fork_firmware.py \
-      devices/<slug>/dev-local.yaml --version 1.0.1 [--remote fork] [--no-push]
+      devices/<slug>/dev-local.yaml --version v1.0.1 [--remote fork] [--no-push]
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -91,6 +92,12 @@ def write_manifest(slug: str, version: str, ota: Path, out: Path) -> None:
     out.write_text(json.dumps(data, indent=2) + "\n")
 
 
+def write_versions(slug: str, version: str, ota: Path, out: Path) -> None:
+    # The web page's firmware list; only the published version is kept.
+    entry = {"version": version, "release_url": "", "ota": {"path": f"{slug}.ota.bin", "md5": firmware_release.md5sum(ota)}}
+    out.write_text(json.dumps({"device": slug, "versions": [entry]}, indent=2) + "\n")
+
+
 def publish(slug: str, version: str, build_dir: Path, remote: str, push: bool) -> None:
     fetched = git("fetch", remote, BRANCH, check=False).returncode == 0
     with tempfile.TemporaryDirectory(prefix="espcontrol-firmware-") as tmp:
@@ -108,6 +115,7 @@ def publish(slug: str, version: str, build_dir: Path, remote: str, push: bool) -
             shutil.copyfile(build_dir / "firmware.ota.bin", target / f"{slug}.ota.bin")
             shutil.copyfile(build_dir / "firmware.factory.bin", target / f"{slug}.factory.bin")
             write_manifest(slug, version, target / f"{slug}.ota.bin", target / "manifest.json")
+            write_versions(slug, version, target / f"{slug}.ota.bin", target / "versions.json")
             git("add", "-A", cwd=work)
             git("commit", "-qm", f"Publish {slug} {version}", cwd=work)
             if push:
@@ -129,6 +137,9 @@ def main() -> int:
     parser.add_argument("--skip-compile", action="store_true", help="Publish the last build as is")
     args = parser.parse_args()
 
+    # The web page shows anything not shaped like v1.2.3 as "Dev build".
+    if not re.fullmatch(r"v[0-9]+(\.[0-9]+){2}([-+][0-9A-Za-z.-]+)?", args.version):
+        parser.error("--version must look like v1.2.3")
     yaml_path = Path(args.yaml).resolve()
     slug = yaml_path.parent.name
     if not args.skip_compile:
