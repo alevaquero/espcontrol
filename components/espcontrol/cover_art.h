@@ -87,18 +87,25 @@ inline bool media_entity_state_usable(const std::string &state) {
          normalized == "buffering";
 }
 
+// Idle players keep the last item (Music Assistant reports it while stopped),
+// so its title, artist, and artwork stay on screen until something else plays
+// or the player turns off.
+inline bool media_entity_state_retains_content(const std::string &state) {
+  return media_entity_state_usable(state) || normalized_media_source(state) == "idle";
+}
+
 inline bool media_artwork_content_current(bool state_known, bool available,
                                           const std::string &state,
                                           bool artwork_present) {
   return artwork_present && state_known && available &&
-         media_entity_state_usable(state);
+         media_entity_state_retains_content(state);
 }
 
 inline bool media_state_change_invalidates_retained_content(
     bool previous_state_known, const std::string &previous_state,
     const std::string &next_state) {
   const std::string normalized_next = normalized_media_source(next_state);
-  if (media_entity_state_usable(normalized_next)) return false;
+  if (media_entity_state_retains_content(normalized_next)) return false;
   return !previous_state_known ||
          normalized_media_source(previous_state) != normalized_next;
 }
