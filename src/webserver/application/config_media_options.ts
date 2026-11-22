@@ -24,6 +24,7 @@ import {
     cardContractOptionSpec,
     copyLargeNumbersOption,
 } from "./config_option_core";
+const MEDIA_CONTROLS_COMBINED_OPTION = "media_controls_combined";
 export function createConfigMediaOptionsFeature(
     deviceProfile: Pick<DeviceConfig, "disabledCardTypes">,
 ) {
@@ -174,7 +175,16 @@ export function createConfigMediaOptionsFeature(
         if (powerEntity) out = setConfigOptionValue(out, MEDIA_POWER_ENTITY_OPTION, powerEntity);
         var tabs: any = normalizeMediaControlTabs(configOptionValue(options, MEDIA_CONTROL_TABS_OPTION), !!powerEntity).join("|");
         if (tabs !== normalizeMediaControlTabs("", !!powerEntity).join("|")) out = setConfigOptionValue(out, MEDIA_CONTROL_TABS_OPTION, tabs);
+        if (configOptionEnabled(options, MEDIA_CONTROLS_COMBINED_OPTION)) out = setConfigOption(out, MEDIA_CONTROLS_COMBINED_OPTION, true);
         return out;
+    }
+    function mediaControlsCombined(b: any) {
+        return !!(b && configOptionEnabled(b.options, MEDIA_CONTROLS_COMBINED_OPTION));
+    }
+    function setMediaControlsCombined(b: any, enabled: boolean) {
+        b.options = setConfigOption(b.options, MEDIA_CONTROLS_COMBINED_OPTION, !!enabled);
+        b.options = normalizeMediaOptions(b.options, b.sensor);
+        return b.options;
     }
     function setMediaControlTabs(b: any, tabs: string[]) {
         b.options = setConfigOptionValue(b.options, MEDIA_CONTROL_TABS_OPTION, tabs.join("|"));
@@ -417,6 +427,8 @@ export function createConfigMediaOptionsFeature(
         mediaControlTabDefinitions,
         mediaControlTabs,
         setMediaControlTabs,
+        mediaControlsCombined,
+        setMediaControlsCombined,
         mediaPowerEntity,
         setMediaPowerEntity,
         mediaVolumeMax,

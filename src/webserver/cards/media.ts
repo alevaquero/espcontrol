@@ -59,6 +59,8 @@ export function registerMediaCardTypes(
         mediaControlTabDefinitions,
         mediaControlTabs,
         setMediaControlTabs,
+        mediaControlsCombined,
+        setMediaControlsCombined,
         mediaPowerEntity,
         setMediaPowerEntity,
         mediaVolumeMax,
@@ -659,6 +661,20 @@ export function registerMediaCardTypes(
                     idPrefix: "media-tab-",
                     hideHeading: true,
                     tabAvailable: function (button: any, tab: string) { return tab !== "power" || !!mediaPowerEntity(button); },
+                });
+                var combinedToggle: any = helpers.toggleRow(
+                    "Volume and Position on Controls",
+                    helpers.idPrefix + "media-controls-combined",
+                    mediaControlsCombined(b));
+                modalSettingsDisclosure.section.appendChild(combinedToggle.row);
+                var combinedNote: any = document.createElement("p");
+                combinedNote.className = "sp-setting-note";
+                combinedNote.textContent = "Adds volume buttons on the right of the Controls tab and a thin track position bar under the buttons. The bar is hidden when the player has no track length, such as a radio station.";
+                modalSettingsDisclosure.section.appendChild(combinedNote);
+                combinedToggle.input.addEventListener("change", function (this: any) {
+                    setMediaControlsCombined(b, this.checked);
+                    b._modalSettingsOpen = true;
+                    helpers.saveField("options", b.options);
                 });
                 var powerDisclosure: any = helpers.disclosureSection(
                     "Optional Power", helpers.idPrefix + "media-optional-power",

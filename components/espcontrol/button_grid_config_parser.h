@@ -63,6 +63,7 @@ constexpr const char *NUMBER_DISPLAY_OPTION = card_runtime_option_name_number_di
 constexpr const char *TEMPERATURE_STEP_OPTION = card_runtime_option_name_temperature_step();
 constexpr const char *VOLUME_MAX_OPTION = card_runtime_option_name_volume_max();
 constexpr const char *MEDIA_CONTROL_TABS_OPTION = card_runtime_option_name_media_tabs();
+constexpr const char *MEDIA_CONTROLS_COMBINED_OPTION = "media_controls_combined";
 constexpr const char *MEDIA_POWER_ENTITY_OPTION = card_runtime_option_name_power_entity();
 constexpr const char *MEDIA_SPEAKER_GROUP_ENTITY_OPTION = card_runtime_option_name_speaker_group_entity();
 constexpr const char *MEDIA_PLAYLIST_CONTENT_ID_OPTION = card_runtime_option_name_playlist_content_id();
@@ -383,6 +384,12 @@ inline void append_media_control_tabs_option(std::string &out, const std::string
   out += std::string(MEDIA_CONTROL_TABS_OPTION) + "=" + encode_compact_field(tabs);
 }
 
+inline void append_media_controls_combined_option(std::string &out, const std::string &options) {
+  if (!cfg_option_token_present(options, MEDIA_CONTROLS_COMBINED_OPTION)) return;
+  if (!out.empty()) out += ",";
+  out += MEDIA_CONTROLS_COMBINED_OPTION;
+}
+
 inline std::string media_card_options_normalized(const std::string &options,
                                                  const std::string &mode) {
   if (mode == "control_modal") {
@@ -393,6 +400,7 @@ inline std::string media_card_options_normalized(const std::string &options,
       out = std::string(MEDIA_POWER_ENTITY_OPTION) + "=" + encode_compact_field(power_entity);
     }
     append_media_control_tabs_option(out, options);
+    append_media_controls_combined_option(out, options);
     std::string speaker_group_entity = trim_saved_option_value(
       cfg_option_value(options, MEDIA_SPEAKER_GROUP_ENTITY_OPTION));
     if (!speaker_group_entity.empty()) {
@@ -488,6 +496,7 @@ inline std::string media_card_options_normalized(const std::string &options,
       out += std::string(MEDIA_POWER_ENTITY_OPTION) + "=" + encode_compact_field(power_entity);
     }
     append_media_control_tabs_option(out, options);
+    append_media_controls_combined_option(out, options);
     return out;
   }
   if (mode != "volume" && mode != "position") return "";
