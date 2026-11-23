@@ -13,6 +13,9 @@ constexpr lv_coord_t CONTROL_MODAL_BACK_BUTTON_REF_PX = DISPLAY_MODAL_BACK_BUTTO
 constexpr lv_coord_t CONTROL_MODAL_BUTTON_REF_PX = DISPLAY_MODAL_BUTTON_REF_PX;
 // The chevron glyph fills only about half of the icon font's height.
 constexpr uint16_t CONTROL_MODAL_BACK_ICON_ZOOM = 358;
+// The Back button's circle and touch area grow past its layout slot, keeping
+// the slot's centre, so it is easier to hit.
+constexpr int CONTROL_MODAL_BACK_BUTTON_GROW_PERCENT = 30;
 constexpr lv_coord_t CONTROL_MODAL_INSET_REF_PX = DISPLAY_MODAL_INSET_REF_PX;
 constexpr lv_coord_t CONTROL_MODAL_CONTROLS_GAP_REF_PX = DISPLAY_MODAL_CONTROLS_GAP_REF_PX;
 constexpr lv_coord_t CONTROL_MODAL_CONTROLS_DOWN_REF_PX = DISPLAY_MODAL_CONTROLS_DOWN_REF_PX;
@@ -760,9 +763,14 @@ inline void control_modal_apply_panel_layout(lv_obj_t *overlay, lv_obj_t *panel,
 inline void control_modal_apply_back_button_layout(lv_obj_t *btn,
                                                    const ControlModalLayout &layout) {
   if (!btn) return;
-  lv_obj_set_size(btn, layout.back_size, layout.back_size);
-  lv_obj_set_style_radius(btn, layout.back_size / 2, LV_PART_MAIN);
-  lv_obj_align(btn, LV_ALIGN_TOP_LEFT, layout.back_inset_x, layout.back_inset_y);
+  lv_coord_t shift = layout.back_size * CONTROL_MODAL_BACK_BUTTON_GROW_PERCENT / 200;
+  const lv_coord_t edge_room = std::min(layout.back_inset_x, layout.back_inset_y) - 4;
+  if (shift > edge_room) shift = edge_room > 0 ? edge_room : 0;
+  const lv_coord_t size = layout.back_size + shift * 2;
+  lv_obj_set_size(btn, size, size);
+  lv_obj_set_style_radius(btn, size / 2, LV_PART_MAIN);
+  lv_obj_align(btn, LV_ALIGN_TOP_LEFT, layout.back_inset_x - shift, layout.back_inset_y - shift);
+  lv_obj_set_ext_click_area(btn, layout.inset / 4);
 }
 
 inline void control_modal_apply_arc_layout(lv_obj_t *arc,
