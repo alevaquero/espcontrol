@@ -13,6 +13,8 @@ enum class MediaControlTab : uint8_t {
   PLAYLISTS = 5,
   ARTISTS = 6,
   RADIOS = 7,
+  // Music Assistant search.
+  SEARCH = 8,
 };
 
 namespace espcontrol::media {
@@ -20,7 +22,7 @@ namespace espcontrol::media {
 constexpr const char *DEFAULT_CONTROL_TABS = "controls|progress|volume|speakers";
 constexpr const char *CONTROL_TABS_WITH_POWER = "controls|progress|volume|speakers|power";
 
-constexpr uint8_t CONTROL_TAB_COUNT = 8;
+constexpr uint8_t CONTROL_TAB_COUNT = 9;
 
 struct ControlTabs {
   MediaControlTab tabs[CONTROL_TAB_COUNT] = {};
@@ -52,6 +54,7 @@ inline const char *control_tab_token(MediaControlTab tab) {
     case MediaControlTab::PLAYLISTS: return "playlists";
     case MediaControlTab::ARTISTS: return "artists";
     case MediaControlTab::RADIOS: return "radios";
+    case MediaControlTab::SEARCH: return "search";
   }
   return "controls";
 }

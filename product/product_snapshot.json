@@ -13,7 +13,7 @@
     "cardTypes": 45,
     "entityNames": 112,
     "icons": 371,
-    "structuralIcons": 34,
+    "structuralIcons": 36,
     "compatibilityFixtureGroups": 2
   },
   "deviceProfiles": {
@@ -5437,7 +5437,8 @@
               "power",
               "playlists",
               "artists",
-              "radios"
+              "radios",
+              "search"
             ],
             "defaultValue": "controls|progress|volume|speakers",
             "omitDefault": true,
@@ -8813,6 +8814,18 @@
         "codepoint": "F0211",
         "mdi": "fast-forward",
         "comment": "Remote card modal button"
+      },
+      {
+        "name": "Magnify",
+        "codepoint": "F0349",
+        "mdi": "magnify",
+        "comment": "Media search tab"
+      },
+      {
+        "name": "Album",
+        "codepoint": "F0025",
+        "mdi": "album",
+        "comment": "Media search album results"
       }
     ],
     "icons": [

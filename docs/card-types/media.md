@@ -71,6 +71,13 @@ If the card's player comes from [Music Assistant](https://www.home-assistant.io/
 - Keys that would not lead to any name are dimmed. The list is sorted by the names shown, so an artist is always under the letter you see, even if Music Assistant files them by surname. Accents are ignored, and a leading word such as "The" or "A" is skipped, so "The Beatles" is under B. **#** covers names that start with a number or symbol. Letter keys are not used in Recent.
 - The list is kept while the panel is running and is refreshed when you open the tab again after 10 minutes.
 
+Switch on the **Search** tab to search Music Assistant from the popup. Type with the on-screen keyboard and tap **Search**; it looks through your library and every connected provider (for example Spotify) at once, up to 10 results per type.
+
+- Results are listed with an icon for their type. Use **All**, **Artists**, **Albums**, **Tracks**, **Playlists**, or **Radio** to narrow the list; types without results are dimmed.
+- Tap a result to replace the queue with it and start playing. The popup then returns to the Controls tab.
+- Tap the search box above the results to change the search. Hold the delete key to clear it. The last search is kept while the panel is running.
+- The keyboard types letters, numbers, space, apostrophe, hyphen and ampersand. Results can include accented names.
+
 The panel finds your Music Assistant setup from the card's player, so there is nothing else to enter. The card's entity must be a Music Assistant player, such as the `media_player` entities the Music Assistant integration creates. If the tab shows **Could not load**, check that the entity belongs to Music Assistant and that the panel is allowed to perform Home Assistant actions.
 
 ## Cover Art

@@ -165,6 +165,7 @@ export function createConfigMediaOptionsFeature(
             { value: "playlists", label: "Playlists" },
             { value: "artists", label: "Artists" },
             { value: "radios", label: "Radios" },
+            { value: "search", label: "Search" },
         ];
     }
     function mediaControlTabs(b: any) {
