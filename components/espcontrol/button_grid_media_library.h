@@ -282,8 +282,15 @@ inline void media_library_update_keys(espcontrol::media::LibraryFilter filter,
 // Place the row pool over the entries around the current scroll position.
 // Rows are only relabelled and restyled when they move to a different entry
 // or the entry being started changes, so plain scrolling stays cheap.
+inline void media_search_render(MediaControlCtx *ctx);
+
 inline void media_library_render(MediaControlCtx *ctx) {
   MediaControlModalUi &ui = media_control_modal_ui();
+  // Search shares the playback bookkeeping, so its results redraw here too.
+  if (ui.tab == MediaControlTab::SEARCH) {
+    media_search_render(ctx);
+    return;
+  }
   if (!ctx || ui.active != ctx || !ui.library_list || ui.library_row_pitch <= 0) return;
   const auto kind = media_library_kind_for_tab(ui.tab);
   const auto filter = media_library_filter(kind);

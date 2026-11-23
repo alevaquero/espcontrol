@@ -34,6 +34,8 @@
 - "\U000F035C"  # mdi-menu (Remote card modal button)
 - "\U000F045F"  # mdi-rewind (Remote card modal button)
 - "\U000F0211"  # mdi-fast-forward (Remote card modal button)
+- "\U000F0349"  # mdi-magnify (Media search tab)
+- "\U000F0025"  # mdi-album (Media search album results)
 - "\U000F0141"  # mdi-chevron-left
 - "\U000F0142"  # mdi-chevron-right
 - "\U000F0004"  # mdi-account

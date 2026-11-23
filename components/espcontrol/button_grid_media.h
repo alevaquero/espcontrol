@@ -149,6 +149,7 @@ struct MediaControlModalUi {
   lv_obj_t *power_tab = nullptr;
   // Playlists, Artists, and Radios, in LibraryKind order.
   lv_obj_t *library_tabs[espcontrol::media::LIBRARY_KIND_COUNT] = {};
+  lv_obj_t *search_tab = nullptr;
   lv_obj_t *content_box = nullptr;
   lv_obj_t *controls_box = nullptr;
   lv_obj_t *progress_box = nullptr;
@@ -425,6 +426,8 @@ inline void media_control_create_controls_extras(MediaControlCtx *ctx);
 inline void media_control_clear_tab_content();
 inline void media_control_select_tab(MediaControlTab tab);
 inline void media_control_create_library_tab_content(MediaControlCtx *ctx);
+inline void media_control_create_search_tab_content(MediaControlCtx *ctx);
+inline void media_search_clear_ui();
 inline void media_control_refresh_speakers(MediaControlCtx *ctx);
 inline void media_control_refresh_group_member_volumes(MediaControlCtx *ctx);
 inline size_t media_control_group_size(MediaControlCtx *ctx);
@@ -3231,6 +3234,7 @@ inline void media_control_apply_tab_visibility() {
     {ui.library_tabs[0], MediaControlTab::PLAYLISTS},
     {ui.library_tabs[1], MediaControlTab::ARTISTS},
     {ui.library_tabs[2], MediaControlTab::RADIOS},
+    {ui.search_tab, MediaControlTab::SEARCH},
   };
   for (const auto &button : buttons) {
     if (!button.btn) continue;
@@ -3287,6 +3291,11 @@ inline bool media_control_ensure_library_tab_buttons(MediaControlCtx *ctx) {
         ui.tab_row, find_icon(espcontrol::media::library_icon_name(kind)), ctx->icon_font, tab);
     }
     if (!ui.library_tabs[i]) return false;
+  }
+  if (ctx->control_tabs.contains(MediaControlTab::SEARCH) && !ui.search_tab) {
+    ui.search_tab = media_control_create_tab_button(
+      ui.tab_row, find_icon("Magnify"), ctx->icon_font, MediaControlTab::SEARCH);
+    if (!ui.search_tab) return false;
   }
   return true;
 }
@@ -4672,6 +4681,7 @@ inline void media_control_clear_tab_content() {
   ui.power_status_lbl = nullptr;
   ui.library_status_lbl = nullptr;
   ui.library_list = nullptr;
+  media_search_clear_ui();
   ui.library_spacer = nullptr;
   ui.library_index = nullptr;
   for (lv_obj_t *&key : ui.library_keys) key = nullptr;
@@ -4728,6 +4738,9 @@ inline void media_control_ensure_tab_content(MediaControlCtx *ctx) {
   else if (espcontrol::media::control_tab_is_library(ui.tab)) {
     media_control_create_library_tab_content(ctx);
   }
+  else if (ui.tab == MediaControlTab::SEARCH) {
+    media_control_create_search_tab_content(ctx);
+  }
 }
 
 inline void media_control_layout_modal(MediaControlCtx *ctx) {
@@ -4771,6 +4784,7 @@ inline void media_control_layout_modal(MediaControlCtx *ctx) {
       case MediaControlTab::PLAYLISTS: btn = ui.library_tabs[0]; break;
       case MediaControlTab::ARTISTS: btn = ui.library_tabs[1]; break;
       case MediaControlTab::RADIOS: btn = ui.library_tabs[2]; break;
+      case MediaControlTab::SEARCH: btn = ui.search_tab; break;
     }
     tabs[i] = {btn, tab};
     if (!show_tabs || !tabs[i].btn) continue;
@@ -5573,3 +5587,4 @@ inline void subscribe_media_slider_state(lv_obj_t *btn_ptr,
 }
 
 #include "button_grid_media_library.h"
+#include "button_grid_media_search.h"

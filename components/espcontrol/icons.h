@@ -51,6 +51,8 @@ static const IconEntry ICON_ENTRIES[] = {
     {"Menu",                               "\U000F035C"},
     {"Rewind",                             "\U000F045F"},
     {"Fast Forward",                       "\U000F0211"},
+    {"Magnify",                            "\U000F0349"},
+    {"Album",                              "\U000F0025"},
     {"Chevron Left",                       "\U000F0141"},
     {"Chevron Right",                      "\U000F0142"},
     {"Account",                            "\U000F0004"},

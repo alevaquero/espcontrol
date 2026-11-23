@@ -32,9 +32,14 @@ int main() {
   assert(normalize_control_tabs_value("radios|controls|playlists|artists") ==
          "radios|controls|playlists|artists");
   const auto every = parse_control_tabs(
-    "controls|progress|volume|speakers|power|playlists|artists|radios", true);
+    "controls|progress|volume|speakers|power|playlists|artists|radios|search", true);
   assert(every.count == CONTROL_TAB_COUNT);
   visible = visible_control_tabs(every, false, false, false);
-  assert(visible.count == 5 && visible.tabs[2] == Tab::PLAYLISTS && visible.tabs[4] == Tab::RADIOS);
+  assert(visible.count == 6 && visible.tabs[2] == Tab::PLAYLISTS && visible.tabs[4] == Tab::RADIOS &&
+         visible.tabs[5] == Tab::SEARCH);
+  // Search is opt-in, keeps its position, and is not a library list.
+  assert(!defaults.contains(Tab::SEARCH));
+  assert(normalize_control_tabs_value("search|controls") == "search|controls");
+  assert(!control_tab_is_library(Tab::SEARCH));
   assert(control_tab_is_library(Tab::ARTISTS) && !control_tab_is_library(Tab::SPEAKERS));
 }
