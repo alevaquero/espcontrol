@@ -27,13 +27,19 @@ int main() {
   assert(media_artwork_content_current(true, true, "playing", true));
   assert(media_artwork_content_current(true, true, "paused", true));
   assert(media_artwork_content_current(true, true, "buffering", true));
-  assert(!media_artwork_content_current(true, true, "idle", true));
+  assert(media_artwork_content_current(true, true, "idle", true));
+  assert(!media_artwork_content_current(true, true, "standby", true));
   assert(!media_artwork_content_current(true, true, "off", true));
   assert(!media_artwork_content_current(true, false, "playing", true));
   assert(!media_artwork_content_current(false, true, "playing", true));
   assert(!media_artwork_content_current(true, true, "playing", false));
-  assert(media_state_change_invalidates_retained_content(false, "unknown", "idle"));
-  assert(media_state_change_invalidates_retained_content(true, "playing", "idle"));
+  // Idle keeps the last item; other stopped states clear it.
+  assert(!media_state_change_invalidates_retained_content(false, "unknown", "idle"));
+  assert(!media_state_change_invalidates_retained_content(true, "playing", "idle"));
+  assert(!media_state_change_invalidates_retained_content(true, "paused", "idle"));
+  assert(media_state_change_invalidates_retained_content(false, "unknown", "off"));
+  assert(media_state_change_invalidates_retained_content(true, "playing", "standby"));
+  assert(media_state_change_invalidates_retained_content(true, "playing", "unavailable"));
   assert(media_state_change_invalidates_retained_content(true, "paused", "off"));
   assert(media_state_change_invalidates_retained_content(true, "idle", "off"));
   assert(!media_state_change_invalidates_retained_content(true, "idle", "idle"));
