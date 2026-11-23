@@ -4839,8 +4839,8 @@ inline void media_control_layout_modal(MediaControlCtx *ctx) {
     ? artist_font->line_height : control_modal_scaled_px(24, layout.short_side);
   lv_coord_t title_h = title_line_h;
   lv_coord_t title_max_h = title_line_h * 2;
-  // With the volume pill, the Controls tab keeps its left part for the
-  // title, buttons, and track bar.
+  // With the volume pill, the title, buttons, and track bar stay centred on
+  // the popup, with the pill's width kept clear on both sides.
   lv_coord_t volume_bar_w = 0;
   lv_coord_t volume_bar_gap = 0;
   if (ui.controls_volume_bar) {
@@ -4849,8 +4849,8 @@ inline void media_control_layout_modal(MediaControlCtx *ctx) {
     volume_bar_gap = control_modal_scaled_px(16, layout.short_side);
     if (volume_bar_gap < 10) volume_bar_gap = 10;
   }
-  const lv_coord_t controls_w = content_w - volume_bar_w - volume_bar_gap;
-  const lv_coord_t controls_shift_x = -(volume_bar_w + volume_bar_gap) / 2;
+  const lv_coord_t controls_w = content_w - (volume_bar_w + volume_bar_gap) * 2;
+  const lv_coord_t controls_left = (content_w - controls_w) / 2;
   lv_coord_t text_w = controls_w * 92 / 100;
   lv_coord_t text_gap = control_modal_scaled_px(8, layout.short_side);
   if (text_gap < 6) text_gap = 6;
@@ -4912,11 +4912,11 @@ inline void media_control_layout_modal(MediaControlCtx *ctx) {
   if (text_top < min_text_top) text_top = min_text_top;
   if (ui.title_lbl) {
     lv_obj_set_size(ui.title_lbl, text_w, title_h);
-    lv_obj_align(ui.title_lbl, LV_ALIGN_TOP_MID, controls_shift_x, text_top);
+    lv_obj_align(ui.title_lbl, LV_ALIGN_TOP_MID, 0, text_top);
   }
   if (ui.artist_lbl) {
     lv_obj_set_size(ui.artist_lbl, text_w, artist_h);
-    lv_obj_align(ui.artist_lbl, LV_ALIGN_TOP_MID, controls_shift_x, text_top + title_h + text_gap);
+    lv_obj_align(ui.artist_lbl, LV_ALIGN_TOP_MID, 0, text_top + title_h + text_gap);
   }
   if (ui.controls_progress_slider) {
     // Times sit at both ends of a thin bar under the transport buttons.
@@ -4936,20 +4936,30 @@ inline void media_control_layout_modal(MediaControlCtx *ctx) {
     lv_obj_set_style_radius(slider, LV_RADIUS_CIRCLE, LV_PART_KNOB);
     lv_obj_set_style_pad_all(slider, bar_h / 2 + 2, LV_PART_KNOB);
     lv_obj_set_ext_click_area(slider, control_modal_scaled_px(18, layout.short_side));
-    lv_obj_align(slider, LV_ALIGN_TOP_LEFT, time_w + bar_gap, row_y + (controls_time_h - bar_h) / 2);
+    lv_obj_align(slider, LV_ALIGN_TOP_LEFT, controls_left + time_w + bar_gap,
+                 row_y + (controls_time_h - bar_h) / 2);
     if (ui.controls_elapsed_lbl) {
       lv_obj_set_size(ui.controls_elapsed_lbl, time_w, controls_time_h);
-      lv_obj_align(ui.controls_elapsed_lbl, LV_ALIGN_TOP_LEFT, 0, row_y);
+      lv_obj_align(ui.controls_elapsed_lbl, LV_ALIGN_TOP_LEFT, controls_left, row_y);
     }
     if (ui.controls_remaining_lbl) {
       lv_obj_set_size(ui.controls_remaining_lbl, time_w, controls_time_h);
-      lv_obj_align(ui.controls_remaining_lbl, LV_ALIGN_TOP_LEFT, controls_w - time_w, row_y);
+      lv_obj_align(ui.controls_remaining_lbl, LV_ALIGN_TOP_LEFT,
+                   controls_left + controls_w - time_w, row_y);
     }
   }
   if (lv_obj_t *bar = ui.controls_volume_bar) {
-    lv_obj_set_size(bar, volume_bar_w, content_h);
+    // Centre the pill on the popup's middle, not the content below the tabs.
+    const lv_coord_t screen_mid = layout.panel_h / 2 - content_top;
+    lv_coord_t bar_h = std::min<lv_coord_t>(screen_mid, content_h - screen_mid) * 2;
+    if (bar_h < volume_bar_w * 3) bar_h = volume_bar_w * 3;
+    if (bar_h > content_h) bar_h = content_h;
+    lv_coord_t bar_y = screen_mid - bar_h / 2;
+    if (bar_y > content_h - bar_h) bar_y = content_h - bar_h;
+    if (bar_y < 0) bar_y = 0;
+    lv_obj_set_size(bar, volume_bar_w, bar_h);
     lv_obj_set_style_radius(bar, volume_bar_w / 2, LV_PART_MAIN);
-    lv_obj_align(bar, LV_ALIGN_TOP_LEFT, content_w - volume_bar_w, 0);
+    lv_obj_align(bar, LV_ALIGN_TOP_LEFT, content_w - volume_bar_w, bar_y);
     lv_obj_t *keys[2] = {ui.volume_plus_btn, ui.volume_minus_btn};
     for (lv_obj_t *key : keys) {
       if (!key) continue;
@@ -5016,13 +5026,13 @@ inline void media_control_layout_modal(MediaControlCtx *ctx) {
   };
   if (transport_layout.modes_on_second_row) {
     lv_obj_t *transport_buttons[3] = {ui.previous_btn, ui.play_btn, ui.next_btn};
-    lv_coord_t button_x = transport_layout.first_row_start_x;
+    lv_coord_t button_x = controls_left + transport_layout.first_row_start_x;
     for (lv_obj_t *button : transport_buttons) {
       layout_media_button(button, button_x, button_y);
       button_x += btn_size + transport_layout.gap;
     }
     lv_obj_t *mode_buttons[2] = {ui.shuffle_btn, ui.repeat_btn};
-    button_x = transport_layout.second_row_start_x;
+    button_x = controls_left + transport_layout.second_row_start_x;
     const lv_coord_t mode_y = button_y + btn_size + transport_layout.row_gap;
     for (lv_obj_t *button : mode_buttons) {
       if (!button) continue;
@@ -5030,7 +5040,7 @@ inline void media_control_layout_modal(MediaControlCtx *ctx) {
       button_x += btn_size + transport_layout.gap;
     }
   } else {
-    lv_coord_t button_x = transport_layout.first_row_start_x;
+    lv_coord_t button_x = controls_left + transport_layout.first_row_start_x;
     for (lv_obj_t *button : buttons) {
       if (!button) continue;
       layout_media_button(button, button_x, button_y);
