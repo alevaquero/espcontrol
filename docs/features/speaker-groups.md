@@ -84,6 +84,8 @@ The optional **Speaker Discovery Entity** card setting can point to another comp
 
 ## Group and Individual Volume
 
+When you add a speaker to the group, the panel first sets it to the main speaker's current volume, then sets it again once the join succeeds, because some speakers restore their own level when they wake. This stops a speaker left at a high volume from blasting the room it joins. Players that only support volume up and down, or whose volume the panel does not know yet, keep their own level.
+
 Individual volume controls appear only for speakers in a multi-speaker group. While grouped, the main Volume tab shows **Group** and its arc represents the arithmetic mean of the available members' current levels. Moving it applies the same difference to each speaker instead of making every speaker equally loud.
 
 For example, `10%`, `25%`, and `40%` has a group level of `25%`. Moving Group Volume to `35%` sends `20%`, `35%`, and `50%`. Volume increases respect the card’s **Maximum Volume** setting, and levels cannot go below `0%`. Lowering the group volume preserves the balance even if a speaker was already above the cap. Group Volume remains disabled until every available member has reported a volume, which avoids losing the existing balance.

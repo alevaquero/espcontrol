@@ -4150,6 +4150,23 @@ inline void media_control_refresh_group_volume(MediaControlCtx *ctx) {
   media_control_refresh_volume(ctx);
 }
 
+inline void media_control_match_joining_speaker_volume(MediaControlCtx *ctx,
+                                                        MediaSpeakerRowState *row) {
+  if (!ctx || !row) return;
+  int target = 0;
+  if (!media_group_join_volume(
+        ctx->volume_control_mode == espcontrol::media::VolumeControlMode::ABSOLUTE,
+        ctx->volume_known, ctx->current_pct, &target)) {
+    return;
+  }
+  ESP_LOGI("media", "Setting %s to %d%% to match %s as it joins the group",
+           row->entity_id.c_str(), target, ctx->entity_id.c_str());
+  send_media_volume_action(row->entity_id, target);
+  row->volume_pct = target;
+  row->volume_known = true;
+  media_control_set_group_volume_target(ctx, row->entity_id, target, row->available);
+}
+
 inline void media_control_group_action_result(
     MediaControlCtx *ctx, const std::string &entity_id, uint32_t call_id,
     const esphome::api::ActionResponse &response) {
@@ -4168,6 +4185,8 @@ inline void media_control_group_action_result(
   } else {
     if (row->selected) {
       media_group_append_unique(ctx->group_members, row->entity_id);
+      // Again after joining: some speakers restore their own level on wake.
+      media_control_match_joining_speaker_volume(ctx, row);
     } else {
       ctx->group_members.erase(
         std::remove(ctx->group_members.begin(), ctx->group_members.end(), row->entity_id),
@@ -4202,6 +4221,8 @@ inline void media_control_toggle_speaker(MediaControlCtx *ctx,
     for (MediaSpeakerRowState *candidate : media_control_modal_ui().speaker_rows) {
       if (candidate && candidate->selected) media_group_append_unique(selected_members, candidate->entity_id);
     }
+    // Set the volume before joining, so the speaker never starts out louder.
+    media_control_match_joining_speaker_volume(ctx, row);
     sent = send_media_group_join_action(ctx->entity_id, selected_members, callback, call_id.get());
   } else {
     sent = send_media_group_unjoin_action(row->entity_id, callback, call_id.get());
