@@ -110,6 +110,21 @@ int main() {
   assert(gesture.release(230, 200, 1100) == TouchpadAction::NONE);
   assert(gesture.move(400, 200) == TouchpadAction::NONE);
 
+  // A touch too short to be a finger is ignored.
+  gesture.press(200, 200, 10000);
+  gesture.release(200, 200, 10000 + espcontrol::remote::TOUCHPAD_TAP_MIN_MS - 1);
+  assert(gesture.poll(11000) == TouchpadAction::NONE);
+  // The finger lifting off after a swipe does not tap, but a real tap later does.
+  gesture.press(100, 200, 20000);
+  for (int x = 110; x <= 200; x += 10) gesture.move(x, 200);
+  gesture.release(200, 200, 20300);
+  gesture.press(200, 200, 20300 + espcontrol::remote::TOUCHPAD_AFTER_SWIPE_MS - 1);
+  gesture.release(200, 200, 20300 + espcontrol::remote::TOUCHPAD_AFTER_SWIPE_MS + 80);
+  assert(gesture.poll(22000) == TouchpadAction::NONE);
+  gesture.press(200, 200, 23000);
+  gesture.release(200, 200, 23100);
+  assert(gesture.poll(23100 + TOUCHPAD_TAP_CONFIRM_MS) == TouchpadAction::SELECT);
+
   // Small pads keep usable minimums.
   TouchpadGesture small;
   small.configure(100);

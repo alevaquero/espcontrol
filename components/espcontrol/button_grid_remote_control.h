@@ -175,6 +175,9 @@ inline void remote_touchpad_event(lv_event_t *event) {
     action = ui.gesture.move(point.x, point.y);
   } else if (code == LV_EVENT_RELEASED) {
     action = ui.gesture.release(point.x, point.y, now);
+    ESP_LOGD("remote", "Touchpad release: held %u ms, moved %d, steps %u, tap %d",
+             static_cast<unsigned>(now - ui.gesture.pressed_at), ui.gesture.moved,
+             static_cast<unsigned>(ui.gesture.steps), ui.gesture.tap_pending);
   } else if (code == LV_EVENT_PRESS_LOST) {
     ui.gesture.cancel();
   } else {
@@ -190,7 +193,9 @@ inline void remote_touchpad_event(lv_event_t *event) {
     }
   }
   // Sending may close the modal after a grid rebuild, so do it last.
-  if (action != TouchpadAction::NONE) remote_send_option(espcontrol::remote::touchpad_action_option(action));
+  if (action == TouchpadAction::NONE) return;
+  ESP_LOGD("remote", "Touchpad swipe: sending %s", espcontrol::remote::touchpad_action_option(action));
+  remote_send_option(espcontrol::remote::touchpad_action_option(action));
 }
 
 struct RemoteModalGeometry {
@@ -448,8 +453,9 @@ inline void remote_setup_touchpad(RemoteModalUi &ui) {
   lv_obj_add_flag(ui.touch_dot, LV_OBJ_FLAG_HIDDEN);
   ui.touch_timer = lv_timer_create([](lv_timer_t *) {
     const auto action = remote_modal_ui().gesture.poll(esphome::millis());
-    if (action != espcontrol::remote::TouchpadAction::NONE)
-      remote_send_option(espcontrol::remote::touchpad_action_option(action));
+    if (action == espcontrol::remote::TouchpadAction::NONE) return;
+    ESP_LOGD("remote", "Touchpad tap: sending OK");
+    remote_send_option(espcontrol::remote::touchpad_action_option(action));
   }, 30, nullptr);
 }
 

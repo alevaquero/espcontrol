@@ -5,8 +5,9 @@
 // finger travels, so a long slide scrolls through several items. A quick
 // flick shorter than one step still sends one step.
 //
-// Touch screens can report a brief lift at the start of a swipe. A tap is
-// therefore held for a moment and dropped if the finger then slides.
+// Touch screens can report brief extra touches around a swipe. A tap is
+// therefore held for a moment and dropped if the finger then slides; touches
+// too short to be a finger, or right after a swipe, never count as taps.
 
 #include <cstdint>
 #include <cstdlib>
@@ -19,6 +20,10 @@ enum class TouchpadAction : uint8_t { NONE, UP, DOWN, LEFT, RIGHT, SELECT };
 constexpr uint32_t TOUCHPAD_TAP_MAX_MS = 600;
 // How long a tap waits for a slide that would cancel it.
 constexpr uint32_t TOUCHPAD_TAP_CONFIRM_MS = 200;
+// Shorter touches are screen glitches; a real tap lasts longer.
+constexpr uint32_t TOUCHPAD_TAP_MIN_MS = 40;
+// Touches starting this soon after a swipe are the finger lifting off.
+constexpr uint32_t TOUCHPAD_AFTER_SWIPE_MS = 300;
 
 struct TouchpadGesture {
   int32_t dead_zone = 20;  // Movement that still counts as a tap.
@@ -29,10 +34,12 @@ struct TouchpadGesture {
   int32_t start_y = 0;
   uint32_t pressed_at = 0;
   uint32_t tap_at = 0;
+  uint32_t swipe_ended_at = 0;
   uint16_t steps = 0;
   bool active = false;
   bool moved = false;
   bool tap_pending = false;
+  bool swiped = false;
 
   // Sizes follow the pad so the feel is the same on every screen.
   void configure(int32_t pad_size) {
@@ -74,11 +81,18 @@ struct TouchpadGesture {
     active = false;
     if (!moved) {
       // Taps in quick succession merge, so a bounced touch selects once.
-      // A long rest is not a tap and also cancels a held one.
-      tap_pending = static_cast<uint32_t>(now - pressed_at) <= TOUCHPAD_TAP_MAX_MS;
-      tap_at = now;
+      const uint32_t held = now - pressed_at;
+      const bool after_swipe = swiped && static_cast<uint32_t>(pressed_at - swipe_ended_at) < TOUCHPAD_AFTER_SWIPE_MS;
+      if (held > TOUCHPAD_TAP_MAX_MS) {
+        tap_pending = false;  // A long rest is not a tap and cancels a held one.
+      } else if (held >= TOUCHPAD_TAP_MIN_MS && !after_swipe) {
+        tap_pending = true;
+        tap_at = now;
+      }
       return TouchpadAction::NONE;
     }
+    swiped = true;
+    swipe_ended_at = now;
     if (steps != 0) return TouchpadAction::NONE;
     return direction(x - start_x, y - start_y);  // A flick shorter than one step.
   }
