@@ -88,6 +88,7 @@ NOOP(lv_label_set_long_mode)
 void lv_obj_set_style_text_align(lv_obj_t *obj,int align,int){obj->text_align=align;}
 void lv_obj_set_pos(lv_obj_t *obj,int x,int y){obj->x=x;obj->y=y;}
 void lv_obj_set_y(lv_obj_t *obj,int y){obj->y=y;}
+void lv_obj_set_x(lv_obj_t *obj,int x){obj->x=x;}
 void lv_obj_add_flag(lv_obj_t *obj,int flag){obj->flags|=flag;}
 void lv_obj_clear_flag(lv_obj_t *obj,int flag){obj->flags&=~flag;}
 void lv_obj_align(lv_obj_t *obj,int,int x,int y){obj->x=(obj->parent?obj->parent->width-obj->width:0)/2+x;obj->y=y;}
@@ -194,8 +195,12 @@ void check_modal_fit(){
     within(ui.days,column.button);
     assert(column.button->y==static_cast<int>(i/3)*(ui.row_height+ui.gap));
     for(const auto *child:column.button->children)within(column.button,child);
-    assert(column.icon->y==ui.day_vertical_padding && column.icon->x==ui.day_padding);
-    assert(column.day->x==column.temperature->x && column.conditions->x==ui.day_padding);
+    // The content block is centred: the same left edge in every panel of a
+    // column position, never inside the padding, and left of centre.
+    assert(column.icon->y==ui.day_vertical_padding && column.icon->x>=ui.day_padding);
+    assert(column.day->x==column.temperature->x && column.conditions->x==column.icon->x);
+    assert(column.icon->x<=column.button->width/2);
+    if(i>=3)assert(column.icon->x==ui.columns[i-3].icon->x);
     assert(column.conditions->y+column.conditions->height+ui.day_vertical_padding<=column.button->height);
     if(ui.side_header){
       assert(column.day->x>=column.icon->x+column.icon->width);

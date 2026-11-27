@@ -140,6 +140,18 @@ inline void weather_daily_refresh_modal() {
       ui.columns.push_back(col);
     }
   }
+  // Each panel's lines stay left-aligned to one edge, and that block is
+  // centred in the panel. The block is as wide as the widest day so all
+  // panels line up.
+  const int icon_height = lv_font_get_line_height(ui.icon_font);
+  const int header_offset = ui.side_header ? icon_height + 4 : 0;
+  auto text_width = [](const std::string &text, const lv_font_t *font, int line_space) {
+    if (text.empty()) return 0;
+    lv_point_t size;
+    lv_text_get_size(&size, text.c_str(), font, 0, line_space, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+    return static_cast<int>(size.x);
+  };
+  int block_width = icon_height;
   for (size_t i = 0; i < count; ++i) {
     const auto &day = forecast.days[i];
     const auto &col = ui.columns[i];
@@ -155,11 +167,30 @@ inline void weather_daily_refresh_modal() {
     for (auto *data : {col.temperature, col.conditions})
       lv_obj_set_style_text_color(data, lv_color_hex(current_theme().text_muted), LV_PART_MAIN);
     lv_label_set_display_text(col.icon, weather_icon_for_state(day.condition));
-    lv_label_set_display_text(col.temperature, weather_daily_temperature_range(day, forecast.temperature_unit).c_str());
+    const auto range = weather_daily_temperature_range(day, forecast.temperature_unit);
+    lv_label_set_display_text(col.temperature, range.c_str());
     const auto info = weather_daily_modal_conditions(ui, day, column_width - ui.day_padding * 2);
     lv_label_set_display_text(col.conditions, info.c_str());
     if (info.empty()) lv_obj_add_flag(col.conditions, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_clear_flag(col.conditions, LV_OBJ_FLAG_HIDDEN);
+    block_width = std::max({block_width, header_offset + text_width(date, ui.font, 0),
+                            header_offset + text_width(range, ui.temperature_font, 0),
+                            text_width(info, ui.temperature_font, ui.text_gap)});
+  }
+  for (size_t i = 0; i < count; ++i) {
+    const auto &col = ui.columns[i];
+    const int column_width = width + (static_cast<int>(i % 3) < remainder ? 1 : 0);
+    const int left = std::max(ui.day_padding, (column_width - block_width) / 2);
+    // Only x moves: a new label's reported position is not valid until the
+    // next layout, so reading y back here would stack every line at the top.
+    auto place = [&](lv_obj_t *label, int x) {
+      lv_obj_set_x(label, x);
+      if (label != col.icon) lv_obj_set_width(label, std::max(0, column_width - ui.day_padding - x));
+    };
+    place(col.icon, left);
+    place(col.day, left + header_offset);
+    place(col.temperature, left + header_offset);
+    place(col.conditions, left);
   }
   lv_obj_set_style_text_color(ui.status, lv_color_hex(current_theme().text_muted), LV_PART_MAIN);
   weather_daily_modal_refresh_status(ui);
@@ -211,11 +242,11 @@ inline void weather_daily_open_modal(WeatherDailyCard *card) {
   lv_obj_set_style_text_color(ui.status, lv_color_hex(current_theme().text_muted), LV_PART_MAIN);
   ui.placeholder_icon = weather_daily_label(ui.body, ui.icon_font);
   lv_obj_set_size(ui.placeholder_icon, icon_height, icon_height);
-  lv_obj_set_pos(ui.placeholder_icon, 0, 0);
-  lv_obj_set_style_text_align(ui.placeholder_icon, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+  lv_obj_set_pos(ui.placeholder_icon, (ui.row_width - icon_height) / 2, 0);
+  lv_obj_set_style_text_align(ui.placeholder_icon, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
   ui.message = weather_daily_label(ui.body, ui.font);
   lv_obj_set_size(ui.message, ui.row_width, text_height);
   lv_obj_set_pos(ui.message, 0, icon_height + ui.gap);
-  lv_obj_set_style_text_align(ui.message, LV_TEXT_ALIGN_LEFT, LV_PART_MAIN);
+  lv_obj_set_style_text_align(ui.message, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
   weather_daily_refresh_modal();
 }
