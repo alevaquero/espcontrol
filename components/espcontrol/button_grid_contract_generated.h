@@ -338,6 +338,7 @@ constexpr const char *CARD_CONTRACT_OPTION_NAME_IMAGE_ICON = "image_icon";
 constexpr const char *CARD_CONTRACT_OPTION_NAME_IMAGE_LABEL = "image_label";
 constexpr const char *CARD_CONTRACT_OPTION_NAME_IMAGE_MODAL_ACTIVITY_INTERVAL = "image_modal_activity_interval";
 constexpr const char *CARD_CONTRACT_OPTION_NAME_IMAGE_MODAL_ACTIVITY_OPEN = "image_modal_activity_open";
+constexpr const char *CARD_CONTRACT_OPTION_NAME_IMAGE_MODAL_LIVE_URL = "image_modal_live_url";
 constexpr const char *CARD_CONTRACT_OPTION_NAME_IMAGE_MODAL_MODE = "image_modal_mode";
 constexpr const char *CARD_CONTRACT_OPTION_NAME_IMAGE_MODAL_REFRESH_INTERVAL = "image_modal_refresh_interval";
 constexpr const char *CARD_CONTRACT_OPTION_NAME_IMAGE_MODAL_REFRESH_MODE = "image_modal_refresh_mode";

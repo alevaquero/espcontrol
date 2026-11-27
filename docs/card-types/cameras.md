@@ -100,6 +100,24 @@ The previous image stays visible while the next snapshot loads. Slow downloads n
 
 `image.*` entities use Home Assistant's image-update timestamp instead of these camera refresh modes. This avoids repeatedly downloading an image that has not been reported as changed.
 
+## Live Video in the Expanded Image
+
+On ESP32-P4 panels, the expanded camera image can show live video instead of snapshots. Open **Live View > Live stream URL** and enter a plain `http://` MJPEG address. Home Assistant's own camera streams are H.264, which the panel cannot decode, so use a tool that converts the camera to MJPEG, such as the go2rtc add-on:
+
+```yaml
+streams:
+  front_door: rtspx://192.168.1.10:7441/abc123
+  front_door_mjpeg: ffmpeg:front_door#video=mjpeg#width=1280
+```
+
+The address is then `http://<go2rtc host>:1984/api/stream.mjpeg?src=front_door_mjpeg`. Open it in a browser first to check that it plays.
+
+- Live video starts when the expanded image opens, including when **Open on activity** opens it. A red dot in the top-right corner shows that the picture is live.
+- It plays for **two minutes** after the image opens or after the last activity from the **Trigger entity**, and for as long as a binary sensor trigger stays on. It then pauses on a fresh snapshot; new activity resumes it. Closing the image stops it.
+- While live frames arrive, snapshot refreshes pause. If the stream stops, the snapshot shows again and the panel keeps trying to reconnect.
+- **Image fit** applies to live video too. Streams up to 1920 × 1080 work; 1280 pixels wide keeps frames quick on the panel and the network.
+- The card on the dashboard still shows snapshots.
+
 ## Refreshing Cards from Home Assistant
 
 Every ESP32-P4 panel exposes a native ESPHome action for refreshing Camera cards on the page currently shown on the panel. It does not create a button entity and does not refresh Media Cover Art or Camera cards on other pages.

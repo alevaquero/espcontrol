@@ -162,6 +162,10 @@ export function createConfigImageOptionsFeature(dependencies: ConfigImageOptions
     function validImageRefreshTrigger(value: string) {
         return /^(binary_sensor|event)\.[a-z0-9_]+$/.test(value);
     }
+    // Matches espcontrol::camera::valid_live_url in the firmware.
+    function validImageLiveUrl(value: string) {
+        return value.length <= 200 && /^http:\/\/[^/\x00-\x20\x7f-\uffff][\x21-\x7e]*$/.test(value);
+    }
     function normalizeImageOptions(this: any, options?: any, entity?: string, draft = false) {
         var out: any = "";
         if (configOptionEnabled(options, IMAGE_LABEL_OPTION)) {
@@ -191,6 +195,9 @@ export function createConfigImageOptionsFeature(dependencies: ConfigImageOptions
                 if (configOptionEnabled(options, "image_modal_activity_open"))
                     out = setConfigOption(out, "image_modal_activity_open", true);
             }
+            const liveUrl = configOptionValue(options, "image_modal_live_url");
+            if (draft ? liveUrl : validImageLiveUrl(liveUrl))
+                out = setConfigOptionValue(out, "image_modal_live_url", liveUrl);
         }
         return preserveCardColorOptions(options, out);
     }
@@ -236,6 +243,7 @@ export function createConfigImageOptionsFeature(dependencies: ConfigImageOptions
         imageIconEnabled,
         normalizeImageOptions,
         validImageRefreshTrigger,
+        validImageLiveUrl,
         setImageLabelEnabled,
         setImageIconEnabled,
         setImageModalMode,

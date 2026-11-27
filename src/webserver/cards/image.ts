@@ -28,6 +28,7 @@ export function registerImageCardTypes(
         imageIconEnabled,
         normalizeImageOptions,
         validImageRefreshTrigger,
+        validImageLiveUrl,
         setImageLabelEnabled,
         setImageIconEnabled,
         setImageModalMode,
@@ -152,6 +153,33 @@ export function registerImageCardTypes(
         entityInput.addEventListener("change", syncRefreshSettings);
         syncVisibility();
     }
+    function renderImageLiveSettings(panel: any, b: any, helpers: any, entityInput: any, livePanel: any) {
+        const isCamera = () => String(b.entity || "").startsWith("camera.");
+        const url = helpers.textField("Live stream URL", helpers.idPrefix + "image-live-url",
+            configOptionValue(b.options, "image_modal_live_url"),
+            "e.g. http://192.168.1.10:1984/api/stream.mjpeg?src=front_door");
+        const help = document.createElement("p");
+        help.className = "sp-setting-note";
+        help.textContent = "Shows live video in the expanded image instead of snapshots. Use an http:// MJPEG address, such as a go2rtc stream converted to MJPEG at 1280 pixels wide or less. Live video plays for two minutes after the image opens or the last activity, then pauses on a fresh snapshot. New activity resumes it. Leave empty to use snapshots only. ESP32-P4 panels only.";
+        panel.appendChild(url.field);
+        panel.appendChild(help);
+        helpers.requireField(url.input, "Enter an http:// address, or leave it empty.",
+            () => isCamera() && url.input.value.trim() !== "", (value: string) => validImageLiveUrl(value.trim()));
+        function syncVisibility() {
+            livePanel.hidden = !isCamera();
+        }
+        function syncLiveSettings() {
+            syncVisibility();
+            const options = setConfigOptionValue(b.options, "image_modal_live_url", url.input.value.trim());
+            b.options = normalizeImageOptions(options, b.entity, true);
+            helpers.saveField("options", b.options);
+        }
+        url.input.addEventListener("input", syncLiveSettings);
+        url.input.addEventListener("change", syncLiveSettings);
+        entityInput.addEventListener("input", syncVisibility);
+        entityInput.addEventListener("change", syncVisibility);
+        syncVisibility();
+    }
     registry.register("image", {
         label: function (this: any) { return cardContractCardLabel("image"); },
         allowInSubpage: function (this: any) { return cardContractAllowInSubpage("image"); },
@@ -199,6 +227,9 @@ export function registerImageCardTypes(
             const refreshSettings = helpers.disclosureSection("Refresh Settings", helpers.idPrefix + "image-refresh-settings", false);
             renderImageRefreshSettings(refreshSettings.section, b, helpers, entityField.input, refreshSettings.panel);
             panel.appendChild(refreshSettings.panel);
+            const liveSettings = helpers.disclosureSection("Live View", helpers.idPrefix + "image-live-settings", false);
+            renderImageLiveSettings(liveSettings.section, b, helpers, entityField.input, liveSettings.panel);
+            panel.appendChild(liveSettings.panel);
         },
         renderPreview: function (this: any, b?: any, helpers?: any) {
             var customBackground: any = helpers && helpers.cardBackgroundColor || "";

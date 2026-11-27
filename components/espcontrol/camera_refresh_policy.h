@@ -124,6 +124,45 @@ struct RefreshSchedule {
   }
 };
 
+// Live view takes a plain http:// MJPEG address such as a go2rtc stream.
+constexpr size_t LIVE_URL_MAX_LEN = 200;
+inline bool valid_live_url(const std::string &value) {
+  if (value.size() <= 7 || value.size() > LIVE_URL_MAX_LEN || value.rfind("http://", 0) != 0 || value[7] == '/')
+    return false;
+  for (const char c : value) {
+    if (static_cast<unsigned char>(c) <= ' ' || static_cast<unsigned char>(c) >= 0x7F) return false;
+  }
+  return true;
+}
+
+// The expanded view streams for two minutes after it opens or the last
+// activity, and for as long as a binary trigger stays on, so a popup left
+// open does not stream forever. New activity resumes it.
+constexpr uint32_t LIVE_IDLE_LIMIT_MS = 120000;
+// Frames older than this count as stalled; the snapshot shows instead.
+constexpr uint32_t LIVE_FRAME_FRESH_MS = 3000;
+
+struct LiveSession {
+  bool open = false;
+  uint32_t last_activity = 0;
+
+  void begin(uint32_t now) {
+    open = true;
+    last_activity = now;
+  }
+  void activity(uint32_t now) {
+    if (open) last_activity = now;
+  }
+  void close() { open = false; }
+  bool allowed(uint32_t now, bool trigger_on) const {
+    return open && (trigger_on || static_cast<uint32_t>(now - last_activity) < LIVE_IDLE_LIMIT_MS);
+  }
+};
+
+inline bool live_frame_fresh(uint32_t now, uint32_t last_frame) {
+  return last_frame != 0 && static_cast<uint32_t>(now - last_frame) < LIVE_FRAME_FRESH_MS;
+}
+
 // A URL/token is not an image revision. Keep separate acknowledgements for tile and modal.
 struct ImageRevision {
   std::string timestamp;

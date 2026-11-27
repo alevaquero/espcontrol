@@ -11,6 +11,8 @@
 #include "driver/jpeg_decode.h"
 #include "driver/ppa.h"
 #include "esp_heap_caps.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "esphome/core/hal.h"
 #include "esphome/core/log.h"
 
@@ -26,6 +28,23 @@ struct P4JpegWorkspace {
   size_t output_capacity{0};
   uint8_t *scaled{nullptr};
   size_t scaled_capacity{0};
+};
+
+// The artwork pipeline and the live stream run on different tasks; one lock
+// covers the shared decoder, scaler and their lazy setup.
+class HardwareLock {
+ public:
+  HardwareLock() {
+    static SemaphoreHandle_t mutex = xSemaphoreCreateMutex();
+    mutex_ = mutex;
+    if (mutex_) xSemaphoreTake(mutex_, portMAX_DELAY);
+  }
+  ~HardwareLock() {
+    if (mutex_) xSemaphoreGive(mutex_);
+  }
+
+ private:
+  SemaphoreHandle_t mutex_{nullptr};
 };
 
 static P4JpegWorkspace &workspace() {
@@ -142,6 +161,7 @@ static bool scale_cover(const uint8_t *source, uint32_t stride_pixels, uint32_t 
 
 bool try_decode_p4_jpeg(const uint8_t *data, size_t size, int target_width, int target_height,
                        bool cover_mode, bool big_endian, HardwareJpegFrame &frame) {
+  HardwareLock lock;
   jpeg_decoder_handle_t handle = decoder();
   if (handle == nullptr || data == nullptr || size == 0) return false;
 
@@ -200,6 +220,112 @@ void release_p4_jpeg_workspace() {
   memory = {};
 }
 
+// Larger sources need too much decode memory per frame; ask for a smaller
+// stream instead. Portrait doorbells such as 1280x1707 fit.
+static constexpr uint32_t STREAM_MAX_SOURCE_PIXELS = 2560 * 1440;
+static constexpr uint32_t STREAM_WARNING_INTERVAL_MS = 10000;
+
+// A rejected stream fails on every frame; report it once every few seconds.
+static bool stream_warning_due() {
+  static uint32_t last = 0;
+  const uint32_t now = millis();
+  if (last != 0 && now - last < STREAM_WARNING_INTERVAL_MS) return false;
+  last = now == 0 ? 1 : now;
+  return true;
+}
+
+bool p4_stream_decoder_init(P4StreamDecoder &stream, size_t input_capacity) {
+  p4_stream_decoder_release(stream);
+  return ensure_decoder_buffer(stream.input, stream.input_capacity, input_capacity, JPEG_DEC_ALLOC_INPUT_BUFFER);
+}
+
+bool p4_stream_decode_frame(P4StreamDecoder &stream, size_t size, int area_width, int area_height,
+                            bool cover, bool big_endian, uint8_t *out, size_t out_capacity,
+                            int &width, int &height) {
+  if (stream.input == nullptr || size == 0 || size > stream.input_capacity || out == nullptr) return false;
+  jpeg_decode_picture_info_t info{};
+  if (jpeg_decoder_get_info(stream.input, size, &info) != ESP_OK || info.width == 0 || info.height == 0 ||
+      info.sample_method == JPEG_DOWN_SAMPLING_GRAY) {
+    return false;
+  }
+  if (static_cast<uint64_t>(info.width) * info.height > STREAM_MAX_SOURCE_PIXELS) {
+    if (stream_warning_due()) {
+      ESP_LOGW(TAG, "Live frame %" PRIu32 "x%" PRIu32 " is too large; use a stream of 2560x1440 or less",
+               info.width, info.height);
+    }
+    return false;
+  }
+  p4::StreamScalePlan plan;
+  if (!p4::stream_scale_plan(info.width, info.height, area_width, area_height, cover, plan) ||
+      static_cast<size_t>(plan.out_width) * plan.out_height * 2 > out_capacity) {
+    if (stream_warning_due()) {
+      ESP_LOGW(TAG, "Live frame %" PRIu32 "x%" PRIu32 " cannot be scaled to %dx%d", info.width, info.height,
+               area_width, area_height);
+    }
+    return false;
+  }
+
+  const uint32_t padded_width = align_up(info.width, 16);
+  const uint32_t padded_height = align_up(info.height, 16);
+  const size_t output_bytes = static_cast<size_t>(padded_width) * padded_height * 2;
+  if (!ensure_decoder_buffer(stream.output, stream.output_capacity, output_bytes, JPEG_DEC_ALLOC_OUTPUT_BUFFER)) {
+    ESP_LOGW(TAG, "Live frame decode memory allocation failed");
+    return false;
+  }
+
+  HardwareLock lock;
+  jpeg_decoder_handle_t handle = decoder();
+  ppa_client_handle_t scale = scaler();
+  if (handle == nullptr || scale == nullptr) return false;
+  jpeg_decode_cfg_t config{};
+  config.output_format = JPEG_DECODE_OUT_FORMAT_RGB565;
+  config.rgb_order = big_endian ? JPEG_DEC_RGB_ELEMENT_ORDER_RGB : JPEG_DEC_RGB_ELEMENT_ORDER_BGR;
+  config.conv_std = JPEG_YUV_RGB_CONV_STD_BT601;
+  uint32_t decoded_bytes = 0;
+  const esp_err_t error = jpeg_decoder_process(handle, &config, stream.input, size, stream.output,
+                                               stream.output_capacity, &decoded_bytes);
+  if (error != ESP_OK || decoded_bytes < output_bytes) {
+    if (stream_warning_due()) {
+      ESP_LOGW(TAG, "JPEG hardware rejected a live frame (%d, %" PRIu32 " of %zu bytes)", error, decoded_bytes,
+               output_bytes);
+    }
+    return false;
+  }
+
+  ppa_srm_oper_config_t srm{};
+  srm.in.buffer = stream.output;
+  srm.in.pic_w = padded_width;
+  srm.in.pic_h = info.height;
+  srm.in.block_w = plan.crop_width;
+  srm.in.block_h = plan.crop_height;
+  srm.in.block_offset_x = plan.crop_x;
+  srm.in.block_offset_y = plan.crop_y;
+  srm.in.srm_cm = PPA_SRM_COLOR_MODE_RGB565;
+  srm.out.buffer = out;
+  srm.out.buffer_size = out_capacity;
+  srm.out.pic_w = plan.out_width;
+  srm.out.pic_h = plan.out_height;
+  srm.out.srm_cm = PPA_SRM_COLOR_MODE_RGB565;
+  srm.rotation_angle = PPA_SRM_ROTATION_ANGLE_0;
+  srm.scale_x = static_cast<float>(plan.steps) / p4::SCALE_FRACTION_STEPS;
+  srm.scale_y = srm.scale_x;
+  srm.mode = PPA_TRANS_MODE_BLOCKING;
+  const esp_err_t scale_error = ppa_do_scale_rotate_mirror(scale, &srm);
+  if (scale_error != ESP_OK) {
+    if (stream_warning_due()) ESP_LOGW(TAG, "PPA could not scale a live frame (%d)", scale_error);
+    return false;
+  }
+  width = plan.out_width;
+  height = plan.out_height;
+  return true;
+}
+
+void p4_stream_decoder_release(P4StreamDecoder &stream) {
+  free(stream.input);
+  free(stream.output);
+  stream = {};
+}
+
 }  // namespace artwork_image
 }  // namespace esphome
 
@@ -210,6 +336,11 @@ namespace artwork_image {
 
 bool try_decode_p4_jpeg(const uint8_t *, size_t, int, int, bool, bool, HardwareJpegFrame &) { return false; }
 void release_p4_jpeg_workspace() {}
+bool p4_stream_decoder_init(P4StreamDecoder &, size_t) { return false; }
+bool p4_stream_decode_frame(P4StreamDecoder &, size_t, int, int, bool, bool, uint8_t *, size_t, int &, int &) {
+  return false;
+}
+void p4_stream_decoder_release(P4StreamDecoder &) {}
 
 }  // namespace artwork_image
 }  // namespace esphome

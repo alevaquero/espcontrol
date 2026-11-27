@@ -20,6 +20,60 @@ constexpr uint32_t exact_scale_steps(uint32_t input_size, uint32_t output_size) 
   return steps > 0 && steps < MAX_SCALE_STEPS ? static_cast<uint32_t>(steps) : 0;
 }
 
+struct StreamScalePlan {
+  uint32_t steps{0};
+  uint32_t crop_x{0};
+  uint32_t crop_y{0};
+  uint32_t crop_width{0};
+  uint32_t crop_height{0};
+  uint32_t out_width{0};
+  uint32_t out_height{0};
+};
+
+// Cover output may overfill the area by up to this much; the display trims it.
+static constexpr uint32_t STREAM_COVER_SLACK_PX = 32;
+
+// Live frames use one PPA step on both axes. Crops are whole 16-pixel blocks
+// so the output size is exact. Fit stays inside the area and leaves bars;
+// cover rounds the crop up so the picture fills the area with no gap.
+inline bool stream_scale_plan(uint32_t source_width, uint32_t source_height, uint32_t area_width,
+                              uint32_t area_height, bool cover, StreamScalePlan &plan) {
+  plan = {};
+  if (source_width < 16 || source_height < 16 || area_width < 16 || area_height < 16) return false;
+  const uint32_t fit_x = area_width * SCALE_FRACTION_STEPS / source_width;
+  const uint32_t fit_y = area_height * SCALE_FRACTION_STEPS / source_height;
+  uint32_t steps = fit_x < fit_y ? fit_x : fit_y;
+  if (cover) {
+    const uint32_t fill_x = (area_width * SCALE_FRACTION_STEPS + source_width - 1) / source_width;
+    const uint32_t fill_y = (area_height * SCALE_FRACTION_STEPS + source_height - 1) / source_height;
+    steps = fill_x > fill_y ? fill_x : fill_y;
+  }
+  if (steps == 0) steps = 1;
+  if (steps >= MAX_SCALE_STEPS) steps = MAX_SCALE_STEPS - 1;
+  // The source crop needed to reach `area` at this step: rounded down to whole
+  // blocks for fit, up for cover, then reduced until it fits the slack.
+  auto crop_for = [steps, cover](uint32_t source, uint32_t area) -> uint32_t {
+    uint32_t crop = source & ~15U;
+    uint32_t needed = cover ? ((area * SCALE_FRACTION_STEPS + steps - 1) / steps + 15) & ~15U
+                            : (area * SCALE_FRACTION_STEPS / steps) & ~15U;
+    if (cover) {
+      while (needed > 16 && needed * steps / SCALE_FRACTION_STEPS > area + STREAM_COVER_SLACK_PX) needed -= 16;
+    }
+    return crop < needed ? crop : needed;
+  };
+  const uint32_t crop_width = crop_for(source_width, area_width);
+  const uint32_t crop_height = crop_for(source_height, area_height);
+  if (crop_width == 0 || crop_height == 0) return false;
+  plan.steps = steps;
+  plan.crop_width = crop_width;
+  plan.crop_height = crop_height;
+  plan.crop_x = (source_width - crop_width) / 2;
+  plan.crop_y = (source_height - crop_height) / 2;
+  plan.out_width = crop_width * steps / SCALE_FRACTION_STEPS;
+  plan.out_height = crop_height * steps / SCALE_FRACTION_STEPS;
+  return true;
+}
+
 }  // namespace p4
 }  // namespace artwork_image
 }  // namespace esphome
