@@ -361,6 +361,7 @@ constexpr const char *CARD_CONTRACT_OPTION_NAME_MN = "mn";
 constexpr const char *CARD_CONTRACT_OPTION_NAME_MODE_ICON = "mode_icon";
 constexpr const char *CARD_CONTRACT_OPTION_NAME_MT = "mt";
 constexpr const char *CARD_CONTRACT_OPTION_NAME_NUMBER_DISPLAY = "number_display";
+constexpr const char *CARD_CONTRACT_OPTION_NAME_NV = "nv";
 constexpr const char *CARD_CONTRACT_OPTION_NAME_OK = "ok";
 constexpr const char *CARD_CONTRACT_OPTION_NAME_ON_PATTERN = "on_pattern";
 constexpr const char *CARD_CONTRACT_OPTION_NAME_PASS64 = "pass64";

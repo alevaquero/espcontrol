@@ -4495,6 +4495,17 @@ export const CARD_CONTRACT_CARDS: Readonly<Record<string, CardTypeSpec>> = {
         ],
         "defaultValue": "bk|hm|mn|rw|pp|ff|pw",
         "omitDefault": true
+      },
+      {
+        "name": "nv",
+        "label": "Navigation",
+        "kind": "choice",
+        "values": [
+          "pad",
+          "touch"
+        ],
+        "defaultValue": "pad",
+        "omitDefault": true
       }
     ],
     "normalization": {
@@ -4547,7 +4558,8 @@ export const CARD_CONTRACT_CARDS: Readonly<Record<string, CardTypeSpec>> = {
         "pp",
         "rw",
         "ff",
-        "ro"
+        "ro",
+        "nv"
       ]
     },
     "default": {
@@ -5326,6 +5338,7 @@ export const CARD_CONTRACT_OPTION_NAMES: Readonly<Record<string, string>> = {
   "mode_icon": "mode_icon",
   "mt": "mt",
   "number_display": "number_display",
+  "nv": "nv",
   "ok": "ok",
   "on_pattern": "on_pattern",
   "pass64": "pass64",

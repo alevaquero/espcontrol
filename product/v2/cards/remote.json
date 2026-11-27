@@ -18,7 +18,8 @@
     { "name": "pp", "label": "Play/Pause", "kind": "text", "omitDefault": true },
     { "name": "rw", "label": "Rewind", "kind": "text", "omitDefault": true },
     { "name": "ff", "label": "Fast Forward", "kind": "text", "omitDefault": true },
-    { "name": "ro", "label": "Button Order", "kind": "text", "values": ["bk", "hm", "mn", "rw", "pp", "ff", "pw"], "defaultValue": "bk|hm|mn|rw|pp|ff|pw", "omitDefault": true }
+    { "name": "ro", "label": "Button Order", "kind": "text", "values": ["bk", "hm", "mn", "rw", "pp", "ff", "pw"], "defaultValue": "bk|hm|mn|rw|pp|ff|pw", "omitDefault": true },
+    { "name": "nv", "label": "Navigation", "kind": "choice", "values": ["pad", "touch"], "defaultValue": "pad", "omitDefault": true }
   ],
   "normalization": {
     "fields": {
@@ -30,7 +31,7 @@
       "options": { "policy": "keep" }
     },
     "unknownOptions": "drop",
-    "canonicalOptionOrder": ["up", "dn", "lt", "rt", "ok", "bk", "hm", "mn", "vu", "vd", "mt", "pw", "pp", "rw", "ff", "ro"]
+    "canonicalOptionOrder": ["up", "dn", "lt", "rt", "ok", "bk", "hm", "mn", "vu", "vd", "mt", "pw", "pp", "rw", "ff", "ro", "nv"]
   },
   "default": {
     "entity": "", "label": "", "icon": "Auto", "icon_on": "Auto",

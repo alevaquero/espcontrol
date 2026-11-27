@@ -36,6 +36,15 @@ The panel sends each command exactly as typed and does not check whether your re
 
 Use the arrows next to the **Button Row** entries to change the order of the extra buttons.
 
+### Touchpad Navigation
+
+Set **Remote Buttons > Navigation** to **Touchpad** to replace the arrow keys with one touch surface, like the Apple TV remote on a phone:
+
+- **Swipe** to move. A short flick sends one Up, Down, Left, or Right command; a longer slide sends one more for each fifth of the touchpad it travels, so you can scroll through a list in one movement. Changing direction mid-slide follows your finger.
+- **Tap** to send OK. Holding your finger still does nothing.
+
+The touchpad uses the same Up, Down, Left, Right, and OK commands as the arrows. Leave one empty and that gesture does nothing. **Arrows** is the default.
+
 ### Other Remotes
 
 | Remote | Example commands |

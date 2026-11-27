@@ -53,4 +53,4 @@ This generated reference lists stable setup facts from the shared card contract.
 | Wifi Sharing | wifi_qr | switch | Yes | Own picker item | Network name; Security: wpa, open; Password; Hidden network; Visible Tabs: qr, credentials, guest | Visible |
 | QR Card | wifi_qr_card | switch | Yes | Wifi Sharing (wifi_qr) | Network name; Security: wpa, open; Password; Hidden network; Visible Tabs: qr, credentials, guest | Visible |
 | Weather Forecast | weather_forecast | weather | Yes | Own picker item | None | Hidden |
-| Remote | remote | remote | Yes | Own picker item | Up; Down; Left; Right; OK; Back; Home; Menu; Volume Up; Volume Down; Mute; Power; Play/Pause; Rewind; Fast Forward; Button Order: bk, hm, mn, rw, pp, ff, pw | Visible |
+| Remote | remote | remote | Yes | Own picker item | Up; Down; Left; Right; OK; Back; Home; Menu; Volume Up; Volume Down; Mute; Power; Play/Pause; Rewind; Fast Forward; Button Order: bk, hm, mn, rw, pp, ff, pw; Navigation: pad, touch | Visible |

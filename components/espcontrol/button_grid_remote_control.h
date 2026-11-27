@@ -1,7 +1,13 @@
 #pragma once
 
 // Remote card modal. Each key sends remote.send_command with the command text
-// saved in the card options; keys without a command are not shown.
+// saved in the card options; keys without a command are not shown. With the
+// touchpad option the direction keys become one surface: tap to select,
+// slide to move.
+
+#include "remote_touchpad.h"
+
+constexpr const char *REMOTE_NAVIGATION_OPTION = "nv";
 
 enum class RemoteKeyGroup : uint8_t {
   DPAD = 0,
@@ -80,8 +86,11 @@ struct RemoteModalUi {
   lv_obj_t *overlay = nullptr;
   lv_obj_t *panel = nullptr;
   lv_obj_t *back_btn = nullptr;
-  lv_obj_t *wheel = nullptr;  // Shared circle behind the direction keys.
+  lv_obj_t *wheel = nullptr;  // Shared circle behind the direction keys, or the touchpad.
   lv_obj_t *volume_bar = nullptr;  // Shared pill behind the volume keys.
+  lv_obj_t *touch_dot = nullptr;  // Follows the finger on the touchpad.
+  bool touchpad = false;
+  espcontrol::remote::TouchpadGesture gesture;
   std::string entity;
   uint32_t generation = 0;
   std::vector<RemoteModalKey> keys;
@@ -129,6 +138,57 @@ inline void remote_send_key(size_t index) {
                              key.command.c_str())) {
     ESP_LOGW("remote", "Unable to send remote command %s", key.def->option);
   }
+}
+
+inline void remote_send_option(const char *option) {
+  if (!option) return;
+  RemoteModalUi &ui = remote_modal_ui();
+  for (size_t i = 0; i < ui.keys.size(); ++i) {
+    if (std::strcmp(ui.keys[i].def->option, option) == 0) {
+      remote_send_key(i);
+      return;
+    }
+  }
+}
+
+inline bool remote_touchpad_enabled(const ParsedCfg &config) {
+  return cfg_option_value(config.options, REMOTE_NAVIGATION_OPTION) == "touch";
+}
+
+inline void remote_touchpad_event(lv_event_t *event) {
+  RemoteModalUi &ui = remote_modal_ui();
+  lv_indev_t *indev = lv_indev_active();
+  if (!ui.wheel || !indev || lv_indev_get_type(indev) != LV_INDEV_TYPE_POINTER) return;
+  lv_point_t point;
+  lv_indev_get_point(indev, &point);
+  lv_area_t area;
+  lv_obj_get_coords(ui.wheel, &area);
+  const lv_event_code_t code = lv_event_get_code(event);
+  const uint32_t now = esphome::millis();
+  using espcontrol::remote::TouchpadAction;
+  TouchpadAction action = TouchpadAction::NONE;
+  if (code == LV_EVENT_PRESSED) {
+    ui.gesture.press(point.x, point.y, now);
+  } else if (code == LV_EVENT_PRESSING) {
+    action = ui.gesture.move(point.x, point.y);
+  } else if (code == LV_EVENT_RELEASED) {
+    action = ui.gesture.release(point.x, point.y, now);
+  } else if (code == LV_EVENT_PRESS_LOST) {
+    ui.gesture.cancel();
+  } else {
+    return;
+  }
+  if (ui.touch_dot) {
+    if (ui.gesture.active) {
+      const lv_coord_t half = lv_obj_get_width(ui.touch_dot) / 2;
+      lv_obj_set_pos(ui.touch_dot, point.x - area.x1 - half, point.y - area.y1 - half);
+      lv_obj_clear_flag(ui.touch_dot, LV_OBJ_FLAG_HIDDEN);
+    } else {
+      lv_obj_add_flag(ui.touch_dot, LV_OBJ_FLAG_HIDDEN);
+    }
+  }
+  // Sending may close the modal after a grid rebuild, so do it last.
+  if (action != TouchpadAction::NONE) remote_send_option(espcontrol::remote::touchpad_action_option(action));
 }
 
 struct RemoteModalGeometry {
@@ -301,8 +361,13 @@ inline void remote_layout_modal(const ControlModalLayout &layout) {
   }
   if (ui.wheel) {
     lv_obj_set_size(ui.wheel, placement.pad_w, placement.pad_w);
-    lv_obj_set_style_radius(ui.wheel, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+    lv_obj_set_style_radius(ui.wheel, ui.touchpad ? k / 2 : LV_RADIUS_CIRCLE, LV_PART_MAIN);
     lv_obj_set_pos(ui.wheel, placement.cluster_x, placement.cluster_y);
+    ui.gesture.configure(placement.pad_w);
+  }
+  if (ui.touch_dot) {
+    const lv_coord_t dot = std::max<lv_coord_t>(24, k * 2 / 3);
+    lv_obj_set_size(ui.touch_dot, dot, dot);
   }
   if (ui.volume_bar) {
     lv_obj_set_size(ui.volume_bar, k, k * 3 + g * 2);
@@ -354,6 +419,33 @@ inline lv_obj_t *remote_create_inset_key(lv_obj_t *surface, const char *icon) {
   return btn;
 }
 
+// The touchpad takes every press itself: it never scrolls the popup or
+// starts a screen gesture, and it tints while touched.
+inline void remote_setup_touchpad(RemoteModalUi &ui) {
+  lv_obj_t *pad = ui.wheel;
+  lv_obj_add_flag(pad, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_clear_flag(pad, LV_OBJ_FLAG_SCROLL_CHAIN_HOR);
+  lv_obj_clear_flag(pad, LV_OBJ_FLAG_SCROLL_CHAIN_VER);
+  lv_obj_clear_flag(pad, LV_OBJ_FLAG_GESTURE_BUBBLE);
+  lv_obj_add_flag(pad, LV_OBJ_FLAG_PRESS_LOCK);
+  const lv_style_selector_t pressed =
+    static_cast<lv_style_selector_t>(LV_PART_MAIN) | static_cast<lv_style_selector_t>(LV_STATE_PRESSED);
+  lv_obj_set_style_bg_color(pad, lv_color_hex(theme_display_color(current_theme().border)), pressed);
+  for (lv_event_code_t code : {LV_EVENT_PRESSED, LV_EVENT_PRESSING, LV_EVENT_RELEASED, LV_EVENT_PRESS_LOST}) {
+    lv_obj_add_event_cb(pad, remote_touchpad_event, code, nullptr);
+  }
+  ui.touch_dot = lv_obj_create(pad);
+  if (!ui.touch_dot) return;
+  lv_obj_set_style_radius(ui.touch_dot, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+  lv_obj_set_style_bg_color(ui.touch_dot, lv_color_hex(DEFAULT_ACCENT_COLOR), LV_PART_MAIN);
+  lv_obj_set_style_bg_opa(ui.touch_dot, LV_OPA_60, LV_PART_MAIN);
+  lv_obj_set_style_border_width(ui.touch_dot, 0, LV_PART_MAIN);
+  lv_obj_set_style_shadow_width(ui.touch_dot, 0, LV_PART_MAIN);
+  lv_obj_clear_flag(ui.touch_dot, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_clear_flag(ui.touch_dot, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_add_flag(ui.touch_dot, LV_OBJ_FLAG_HIDDEN);
+}
+
 inline void remote_open_modal(const ParsedCfg &config, lv_obj_t *owner) {
   if (config.entity.empty()) {
     ESP_LOGW("remote", "Remote card has no remote entity");
@@ -390,9 +482,11 @@ inline void remote_open_modal(const ParsedCfg &config, lv_obj_t *owner) {
   }
 
   const uint32_t surface = theme_display_color(current_theme().surface_primary);
+  ui.touchpad = remote_touchpad_enabled(config);
   for (const RemoteModalKey &key : ui.keys) {
     if (key.def->group == RemoteKeyGroup::DPAD && !ui.wheel) {
       ui.wheel = remote_create_key_surface(ui.panel, surface);
+      if (ui.wheel && ui.touchpad) remote_setup_touchpad(ui);
     } else if (key.def->group == RemoteKeyGroup::VOLUME && !ui.volume_bar) {
       ui.volume_bar = remote_create_key_surface(ui.panel, surface);
     }
@@ -401,7 +495,7 @@ inline void remote_open_modal(const ParsedCfg &config, lv_obj_t *owner) {
     RemoteModalKey &key = ui.keys[i];
     const char *icon = key.def->icon ? find_icon(key.def->icon) : nullptr;
     if (key.def->group == RemoteKeyGroup::DPAD) {
-      key.btn = ui.wheel ? remote_create_inset_key(ui.wheel, icon) : nullptr;
+      key.btn = ui.wheel && !ui.touchpad ? remote_create_inset_key(ui.wheel, icon) : nullptr;
     } else if (key.def->group == RemoteKeyGroup::VOLUME) {
       key.btn = ui.volume_bar ? remote_create_inset_key(ui.volume_bar, icon) : nullptr;
     } else {
