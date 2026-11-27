@@ -125,6 +125,11 @@ int main() {
   gesture.release(200, 200, 23100);
   assert(gesture.poll(23100 + TOUCHPAD_TAP_CONFIRM_MS) == TouchpadAction::SELECT);
 
+  // A swipe whose only movement shows up at release is still a flick.
+  gesture.press(200, 100, 30000);
+  assert(gesture.release(205, 260, 30150) == TouchpadAction::DOWN);
+  assert(gesture.poll(31000) == TouchpadAction::NONE);
+
   // Small pads keep usable minimums.
   TouchpadGesture small;
   small.configure(100);

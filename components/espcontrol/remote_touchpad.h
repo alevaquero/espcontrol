@@ -79,6 +79,11 @@ struct TouchpadGesture {
   TouchpadAction release(int32_t x, int32_t y, uint32_t now) {
     if (!active) return TouchpadAction::NONE;
     active = false;
+    // The finger may have moved between the last update and lifting off.
+    if (!moved && (std::abs(x - start_x) > dead_zone || std::abs(y - start_y) > dead_zone)) {
+      moved = true;
+      tap_pending = false;
+    }
     if (!moved) {
       // Taps in quick succession merge, so a bounced touch selects once.
       const uint32_t held = now - pressed_at;

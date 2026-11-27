@@ -91,6 +91,8 @@ struct RemoteModalUi {
   lv_obj_t *touch_dot = nullptr;  // Follows the finger on the touchpad.
   lv_timer_t *touch_timer = nullptr;  // Sends held taps.
   uint16_t touch_moves = 0;  // Diagnostics: PRESSING events in this touch.
+  uint32_t touch_last_event = 0;
+  uint32_t touch_max_gap = 0;
   lv_point_t touch_start{};
   bool touchpad = false;
   espcontrol::remote::TouchpadGesture gesture;
@@ -175,14 +177,20 @@ inline void remote_touchpad_event(lv_event_t *event) {
     ui.gesture.press(point.x, point.y, now);
     ui.touch_moves = 0;
     ui.touch_start = point;
+    ui.touch_last_event = now;
+    ui.touch_max_gap = 0;
   } else if (code == LV_EVENT_PRESSING) {
     ++ui.touch_moves;
+    ui.touch_max_gap = std::max<uint32_t>(ui.touch_max_gap, now - ui.touch_last_event);
+    ui.touch_last_event = now;
     action = ui.gesture.move(point.x, point.y);
   } else if (code == LV_EVENT_RELEASED) {
+    ui.touch_max_gap = std::max<uint32_t>(ui.touch_max_gap, now - ui.touch_last_event);
     action = ui.gesture.release(point.x, point.y, now);
-    ESP_LOGD("remote", "Touchpad release: held %u ms, %u move events, from %d,%d to %d,%d, "
+    ESP_LOGD("remote", "Touchpad release: held %u ms, %u move events, longest gap %u ms, from %d,%d to %d,%d, "
              "dead zone %d, moved %d, steps %u, tap %d",
              static_cast<unsigned>(now - ui.gesture.pressed_at), static_cast<unsigned>(ui.touch_moves),
+             static_cast<unsigned>(ui.touch_max_gap),
              static_cast<int>(ui.touch_start.x), static_cast<int>(ui.touch_start.y),
              static_cast<int>(point.x), static_cast<int>(point.y), static_cast<int>(ui.gesture.dead_zone),
              ui.gesture.moved, static_cast<unsigned>(ui.gesture.steps), ui.gesture.tap_pending);
@@ -436,7 +444,8 @@ inline lv_obj_t *remote_create_inset_key(lv_obj_t *surface, const char *icon) {
 }
 
 // The touchpad takes every press itself: it never scrolls the popup or
-// starts a screen gesture, and it tints while touched.
+// starts a screen gesture. It does not tint while touched: redrawing the whole
+// pad delays touch reads on rotated panels, so a quick swipe went unseen.
 inline void remote_setup_touchpad(RemoteModalUi &ui) {
   lv_obj_t *pad = ui.wheel;
   lv_obj_add_flag(pad, LV_OBJ_FLAG_CLICKABLE);
@@ -444,9 +453,6 @@ inline void remote_setup_touchpad(RemoteModalUi &ui) {
   lv_obj_clear_flag(pad, LV_OBJ_FLAG_SCROLL_CHAIN_VER);
   lv_obj_clear_flag(pad, LV_OBJ_FLAG_GESTURE_BUBBLE);
   lv_obj_add_flag(pad, LV_OBJ_FLAG_PRESS_LOCK);
-  const lv_style_selector_t pressed =
-    static_cast<lv_style_selector_t>(LV_PART_MAIN) | static_cast<lv_style_selector_t>(LV_STATE_PRESSED);
-  lv_obj_set_style_bg_color(pad, lv_color_hex(theme_display_color(current_theme().border)), pressed);
   for (lv_event_code_t code : {LV_EVENT_PRESSED, LV_EVENT_PRESSING, LV_EVENT_RELEASED, LV_EVENT_PRESS_LOST}) {
     lv_obj_add_event_cb(pad, remote_touchpad_event, code, nullptr);
   }
