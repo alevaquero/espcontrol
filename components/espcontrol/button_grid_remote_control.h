@@ -90,10 +90,6 @@ struct RemoteModalUi {
   lv_obj_t *volume_bar = nullptr;  // Shared pill behind the volume keys.
   lv_obj_t *touch_dot = nullptr;  // Follows the finger on the touchpad.
   lv_timer_t *touch_timer = nullptr;  // Sends held taps.
-  uint16_t touch_moves = 0;  // Diagnostics: PRESSING events in this touch.
-  uint32_t touch_last_event = 0;
-  uint32_t touch_max_gap = 0;
-  lv_point_t touch_start{};
   bool touchpad = false;
   espcontrol::remote::TouchpadGesture gesture;
   std::string entity;
@@ -175,27 +171,11 @@ inline void remote_touchpad_event(lv_event_t *event) {
   TouchpadAction action = TouchpadAction::NONE;
   if (code == LV_EVENT_PRESSED) {
     ui.gesture.press(point.x, point.y, now);
-    ui.touch_moves = 0;
-    ui.touch_start = point;
-    ui.touch_last_event = now;
-    ui.touch_max_gap = 0;
   } else if (code == LV_EVENT_PRESSING) {
-    ++ui.touch_moves;
-    ui.touch_max_gap = std::max<uint32_t>(ui.touch_max_gap, now - ui.touch_last_event);
-    ui.touch_last_event = now;
     action = ui.gesture.move(point.x, point.y);
   } else if (code == LV_EVENT_RELEASED) {
-    ui.touch_max_gap = std::max<uint32_t>(ui.touch_max_gap, now - ui.touch_last_event);
     action = ui.gesture.release(point.x, point.y, now);
-    ESP_LOGD("remote", "Touchpad release: held %u ms, %u move events, longest gap %u ms, from %d,%d to %d,%d, "
-             "dead zone %d, moved %d, steps %u, tap %d",
-             static_cast<unsigned>(now - ui.gesture.pressed_at), static_cast<unsigned>(ui.touch_moves),
-             static_cast<unsigned>(ui.touch_max_gap),
-             static_cast<int>(ui.touch_start.x), static_cast<int>(ui.touch_start.y),
-             static_cast<int>(point.x), static_cast<int>(point.y), static_cast<int>(ui.gesture.dead_zone),
-             ui.gesture.moved, static_cast<unsigned>(ui.gesture.steps), ui.gesture.tap_pending);
   } else if (code == LV_EVENT_PRESS_LOST) {
-    ESP_LOGD("remote", "Touchpad press lost after %u move events", static_cast<unsigned>(ui.touch_moves));
     ui.gesture.cancel();
   } else {
     return;
