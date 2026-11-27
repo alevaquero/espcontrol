@@ -90,6 +90,8 @@ struct RemoteModalUi {
   lv_obj_t *volume_bar = nullptr;  // Shared pill behind the volume keys.
   lv_obj_t *touch_dot = nullptr;  // Follows the finger on the touchpad.
   lv_timer_t *touch_timer = nullptr;  // Sends held taps.
+  uint16_t touch_moves = 0;  // Diagnostics: PRESSING events in this touch.
+  lv_point_t touch_start{};
   bool touchpad = false;
   espcontrol::remote::TouchpadGesture gesture;
   std::string entity;
@@ -171,14 +173,21 @@ inline void remote_touchpad_event(lv_event_t *event) {
   TouchpadAction action = TouchpadAction::NONE;
   if (code == LV_EVENT_PRESSED) {
     ui.gesture.press(point.x, point.y, now);
+    ui.touch_moves = 0;
+    ui.touch_start = point;
   } else if (code == LV_EVENT_PRESSING) {
+    ++ui.touch_moves;
     action = ui.gesture.move(point.x, point.y);
   } else if (code == LV_EVENT_RELEASED) {
     action = ui.gesture.release(point.x, point.y, now);
-    ESP_LOGD("remote", "Touchpad release: held %u ms, moved %d, steps %u, tap %d",
-             static_cast<unsigned>(now - ui.gesture.pressed_at), ui.gesture.moved,
-             static_cast<unsigned>(ui.gesture.steps), ui.gesture.tap_pending);
+    ESP_LOGD("remote", "Touchpad release: held %u ms, %u move events, from %d,%d to %d,%d, "
+             "dead zone %d, moved %d, steps %u, tap %d",
+             static_cast<unsigned>(now - ui.gesture.pressed_at), static_cast<unsigned>(ui.touch_moves),
+             static_cast<int>(ui.touch_start.x), static_cast<int>(ui.touch_start.y),
+             static_cast<int>(point.x), static_cast<int>(point.y), static_cast<int>(ui.gesture.dead_zone),
+             ui.gesture.moved, static_cast<unsigned>(ui.gesture.steps), ui.gesture.tap_pending);
   } else if (code == LV_EVENT_PRESS_LOST) {
+    ESP_LOGD("remote", "Touchpad press lost after %u move events", static_cast<unsigned>(ui.touch_moves));
     ui.gesture.cancel();
   } else {
     return;
