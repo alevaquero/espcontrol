@@ -89,6 +89,7 @@ struct RemoteModalUi {
   lv_obj_t *wheel = nullptr;  // Shared circle behind the direction keys, or the touchpad.
   lv_obj_t *volume_bar = nullptr;  // Shared pill behind the volume keys.
   lv_obj_t *touch_dot = nullptr;  // Follows the finger on the touchpad.
+  lv_timer_t *touch_timer = nullptr;  // Sends held taps.
   bool touchpad = false;
   espcontrol::remote::TouchpadGesture gesture;
   std::string entity;
@@ -112,6 +113,7 @@ inline void set_remote_icon_font(const lv_font_t *font) {
 
 inline void remote_hide_modal() {
   RemoteModalUi &ui = remote_modal_ui();
+  if (ui.touch_timer) lv_timer_del(ui.touch_timer);
   control_modal_delete_overlay(ControlModalKind::REMOTE_CONTROL, ui.overlay);
   ui = RemoteModalUi();
 }
@@ -444,6 +446,11 @@ inline void remote_setup_touchpad(RemoteModalUi &ui) {
   lv_obj_clear_flag(ui.touch_dot, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_clear_flag(ui.touch_dot, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_add_flag(ui.touch_dot, LV_OBJ_FLAG_HIDDEN);
+  ui.touch_timer = lv_timer_create([](lv_timer_t *) {
+    const auto action = remote_modal_ui().gesture.poll(esphome::millis());
+    if (action != espcontrol::remote::TouchpadAction::NONE)
+      remote_send_option(espcontrol::remote::touchpad_action_option(action));
+  }, 30, nullptr);
 }
 
 inline void remote_open_modal(const ParsedCfg &config, lv_obj_t *owner) {

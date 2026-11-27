@@ -6,6 +6,7 @@
 
 #include "remote_touchpad.h"
 
+using espcontrol::remote::TOUCHPAD_TAP_CONFIRM_MS;
 using espcontrol::remote::TouchpadAction;
 using espcontrol::remote::TouchpadGesture;
 
@@ -29,6 +30,8 @@ std::vector<TouchpadAction> slide(TouchpadGesture &gesture, int x, int y, int dx
   }
   TouchpadAction action = gesture.release(x + dx, y + dy, 1000 + duration);
   if (action != TouchpadAction::NONE) actions.push_back(action);
+  action = gesture.poll(1000 + duration + TOUCHPAD_TAP_CONFIRM_MS);
+  if (action != TouchpadAction::NONE) actions.push_back(action);
   return actions;
 }
 
@@ -37,13 +40,44 @@ std::vector<TouchpadAction> slide(TouchpadGesture &gesture, int x, int y, int dx
 int main() {
   TouchpadGesture gesture = pad();
 
-  // A tap, with a little jitter, selects.
+  // A tap, with a little jitter, selects once no slide follows it.
   gesture.press(200, 200, 1000);
   assert(gesture.move(210, 195) == TouchpadAction::NONE);
-  assert(gesture.release(212, 196, 1200) == TouchpadAction::SELECT);
+  assert(gesture.release(212, 196, 1200) == TouchpadAction::NONE);
+  assert(gesture.poll(1200 + TOUCHPAD_TAP_CONFIRM_MS - 1) == TouchpadAction::NONE);
+  assert(gesture.poll(1200 + TOUCHPAD_TAP_CONFIRM_MS) == TouchpadAction::SELECT);
+  assert(gesture.poll(5000) == TouchpadAction::NONE);  // Sent once.
   // Resting a finger longer than a tap does nothing.
   gesture.press(200, 200, 1000);
   assert(gesture.release(200, 200, 1000 + espcontrol::remote::TOUCHPAD_TAP_MAX_MS + 1) == TouchpadAction::NONE);
+  assert(gesture.poll(5000) == TouchpadAction::NONE);
+
+  // A touch that bounces at the start of a swipe sends only the swipe.
+  gesture.press(200, 200, 1000);
+  assert(gesture.release(201, 200, 1015) == TouchpadAction::NONE);
+  gesture.press(203, 200, 1030);
+  assert(gesture.poll(1300) == TouchpadAction::NONE);  // Held while the finger is down.
+  std::vector<TouchpadAction> bounced;
+  for (int x = 213; x <= 293; x += 10) {
+    TouchpadAction action = gesture.move(x, 200);
+    if (action != TouchpadAction::NONE) bounced.push_back(action);
+  }
+  assert(gesture.release(293, 200, 1400) == TouchpadAction::NONE);
+  assert(gesture.poll(2000) == TouchpadAction::NONE);
+  assert((bounced == std::vector<TouchpadAction>{TouchpadAction::RIGHT}));
+  // A bounced tap selects once.
+  gesture.press(200, 200, 1000);
+  gesture.release(200, 200, 1010);
+  gesture.press(201, 200, 1020);
+  gesture.release(201, 200, 1100);
+  assert(gesture.poll(1100 + TOUCHPAD_TAP_CONFIRM_MS) == TouchpadAction::SELECT);
+  assert(gesture.poll(3000) == TouchpadAction::NONE);
+  // A bounce followed by resting the finger does nothing.
+  gesture.press(200, 200, 1000);
+  gesture.release(200, 200, 1010);
+  gesture.press(200, 200, 1020);
+  gesture.release(200, 200, 1020 + espcontrol::remote::TOUCHPAD_TAP_MAX_MS + 1);
+  assert(gesture.poll(5000) == TouchpadAction::NONE);
 
   // A short flick sends one step in its direction.
   assert((slide(gesture, 200, 200, 50, 0) == std::vector<TouchpadAction>{TouchpadAction::RIGHT}));
