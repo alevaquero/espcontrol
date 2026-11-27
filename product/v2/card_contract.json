@@ -5004,6 +5004,17 @@
           ],
           "defaultValue": "bk|hm|mn|rw|pp|ff|pw",
           "omitDefault": true
+        },
+        {
+          "name": "nv",
+          "label": "Navigation",
+          "kind": "choice",
+          "values": [
+            "pad",
+            "touch"
+          ],
+          "defaultValue": "pad",
+          "omitDefault": true
         }
       ],
       "normalization": {
@@ -5056,7 +5067,8 @@
           "pp",
           "rw",
           "ff",
-          "ro"
+          "ro",
+          "nv"
         ]
       },
       "default": {

@@ -38,6 +38,8 @@ const REMOTE_ROW_KEYS: [string, string, string][] = [
     ["pw", "Power", "suspend"],
 ];
 const REMOTE_ROW_ORDER_OPTION = "ro";
+// "touch" turns the direction keys into a touchpad: swipe to move, tap for OK.
+const REMOTE_NAVIGATION_OPTION = "nv";
 const REMOTE_DEFAULT_ROW_ORDER = REMOTE_ROW_KEYS.map(function (key) { return key[0]; });
 const REMOTE_OPTION_NAMES = REMOTE_PAD_KEYS.concat(REMOTE_VOLUME_KEYS, REMOTE_ROW_KEYS)
     .map(function (key) { return key[0]; })
@@ -75,6 +77,8 @@ export function normalizeRemoteOptions(options: unknown): string {
             out = setConfigOptionValue(out, name, value);
     });
     out = setRemoteRowOrder(out, remoteRowOrder(options));
+    if (configOptionValue(options, REMOTE_NAVIGATION_OPTION) === "touch")
+        out = setConfigOptionValue(out, REMOTE_NAVIGATION_OPTION, "touch");
     return preserveCardColorOptions(options, out);
 }
 
@@ -177,7 +181,25 @@ export function registerRemoteCardTypes(
                     bindCommandInput(field.input, key[0]);
                 });
             }
-            renderGroup("Direction Pad", REMOTE_PAD_KEYS);
+            var touchpad: boolean = configOptionValue(b.options, REMOTE_NAVIGATION_OPTION) === "touch";
+            var navigation: any = helpers.selectField("Navigation", helpers.idPrefix + "remote-navigation", [
+                ["pad", "Arrows"],
+                ["touch", "Touchpad"],
+            ], touchpad ? "touch" : "pad");
+            section.appendChild(navigation.field);
+            var navigationHint: any = document.createElement("div");
+            navigationHint.className = "sp-field-hint";
+            navigationHint.textContent = touchpad
+                ? "Swipe on the touchpad to send Up, Down, Left or Right; a longer swipe sends several steps. Tap to send OK."
+                : "Arrow keys around an OK button.";
+            section.appendChild(navigationHint);
+            navigation.select.addEventListener("change", function (this: any) {
+                b.options = setConfigOptionValue(b.options, REMOTE_NAVIGATION_OPTION, this.value === "touch" ? "touch" : "");
+                b._remoteButtonsOpen = true;
+                helpers.saveField("options", b.options);
+                renderButtonSettings();
+            });
+            renderGroup(touchpad ? "Touchpad Commands" : "Direction Pad", REMOTE_PAD_KEYS);
             renderGroup("Volume", REMOTE_VOLUME_KEYS);
 
             var rowHeading: any = document.createElement("div");
