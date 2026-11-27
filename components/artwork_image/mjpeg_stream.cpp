@@ -85,7 +85,7 @@ void handle_frame(Session &session, size_t size) {
   int height = 0;
   if (!p4_stream_decode_frame(session.decoder, size, s.area_width, s.area_height, s.cover, s.big_endian,
                               s.buffers[target], s.buffer_capacity, width, height)) {
-    if (session.decode_failures++ % 50 == 0) ESP_LOGW(TAG, "Could not decode a live frame (%zu bytes)", size);
+    ++session.decode_failures;  // The decoder logs the reason, rate limited.
     return;
   }
   lock();

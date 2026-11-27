@@ -220,8 +220,19 @@ void release_p4_jpeg_workspace() {
   memory = {};
 }
 
-// Larger sources would need several megabytes per frame; ask for a smaller stream instead.
-static constexpr uint32_t STREAM_MAX_SOURCE_PIXELS = 1920 * 1088;
+// Larger sources need too much decode memory per frame; ask for a smaller
+// stream instead. Portrait doorbells such as 1280x1707 fit.
+static constexpr uint32_t STREAM_MAX_SOURCE_PIXELS = 2560 * 1440;
+static constexpr uint32_t STREAM_WARNING_INTERVAL_MS = 10000;
+
+// A rejected stream fails on every frame; report it once every few seconds.
+static bool stream_warning_due() {
+  static uint32_t last = 0;
+  const uint32_t now = millis();
+  if (last != 0 && now - last < STREAM_WARNING_INTERVAL_MS) return false;
+  last = now == 0 ? 1 : now;
+  return true;
+}
 
 bool p4_stream_decoder_init(P4StreamDecoder &stream, size_t input_capacity) {
   p4_stream_decoder_release(stream);
@@ -238,14 +249,21 @@ bool p4_stream_decode_frame(P4StreamDecoder &stream, size_t size, int area_width
     return false;
   }
   if (static_cast<uint64_t>(info.width) * info.height > STREAM_MAX_SOURCE_PIXELS) {
-    ESP_LOGW(TAG, "Live frame %" PRIu32 "x%" PRIu32 " is too large; use a stream of 1920x1080 or less",
-             info.width, info.height);
+    if (stream_warning_due()) {
+      ESP_LOGW(TAG, "Live frame %" PRIu32 "x%" PRIu32 " is too large; use a stream of 2560x1440 or less",
+               info.width, info.height);
+    }
     return false;
   }
   p4::StreamScalePlan plan;
-  if (!p4::stream_scale_plan(info.width, info.height, area_width, area_height, cover, plan)) return false;
-  const size_t target_bytes = static_cast<size_t>(plan.out_width) * plan.out_height * 2;
-  if (target_bytes > out_capacity) return false;
+  if (!p4::stream_scale_plan(info.width, info.height, area_width, area_height, cover, plan) ||
+      static_cast<size_t>(plan.out_width) * plan.out_height * 2 > out_capacity) {
+    if (stream_warning_due()) {
+      ESP_LOGW(TAG, "Live frame %" PRIu32 "x%" PRIu32 " cannot be scaled to %dx%d", info.width, info.height,
+               area_width, area_height);
+    }
+    return false;
+  }
 
   const uint32_t padded_width = align_up(info.width, 16);
   const uint32_t padded_height = align_up(info.height, 16);
@@ -264,9 +282,13 @@ bool p4_stream_decode_frame(P4StreamDecoder &stream, size_t size, int area_width
   config.rgb_order = big_endian ? JPEG_DEC_RGB_ELEMENT_ORDER_RGB : JPEG_DEC_RGB_ELEMENT_ORDER_BGR;
   config.conv_std = JPEG_YUV_RGB_CONV_STD_BT601;
   uint32_t decoded_bytes = 0;
-  if (jpeg_decoder_process(handle, &config, stream.input, size, stream.output, stream.output_capacity,
-                           &decoded_bytes) != ESP_OK ||
-      decoded_bytes < output_bytes) {
+  const esp_err_t error = jpeg_decoder_process(handle, &config, stream.input, size, stream.output,
+                                               stream.output_capacity, &decoded_bytes);
+  if (error != ESP_OK || decoded_bytes < output_bytes) {
+    if (stream_warning_due()) {
+      ESP_LOGW(TAG, "JPEG hardware rejected a live frame (%d, %" PRIu32 " of %zu bytes)", error, decoded_bytes,
+               output_bytes);
+    }
     return false;
   }
 
@@ -288,7 +310,11 @@ bool p4_stream_decode_frame(P4StreamDecoder &stream, size_t size, int area_width
   srm.scale_x = static_cast<float>(plan.steps) / p4::SCALE_FRACTION_STEPS;
   srm.scale_y = srm.scale_x;
   srm.mode = PPA_TRANS_MODE_BLOCKING;
-  if (ppa_do_scale_rotate_mirror(scale, &srm) != ESP_OK) return false;
+  const esp_err_t scale_error = ppa_do_scale_rotate_mirror(scale, &srm);
+  if (scale_error != ESP_OK) {
+    if (stream_warning_due()) ESP_LOGW(TAG, "PPA could not scale a live frame (%d)", scale_error);
+    return false;
+  }
   width = plan.out_width;
   height = plan.out_height;
   return true;
