@@ -30,9 +30,12 @@ struct StreamScalePlan {
   uint32_t out_height{0};
 };
 
+// Cover output may overfill the area by up to this much; the display trims it.
+static constexpr uint32_t STREAM_COVER_SLACK_PX = 32;
+
 // Live frames use one PPA step on both axes. Crops are whole 16-pixel blocks
-// so the output size is exact, and the output never exceeds the area: cover
-// trims the source to fill it, fit leaves bars around the whole picture.
+// so the output size is exact. Fit stays inside the area and leaves bars;
+// cover rounds the crop up so the picture fills the area with no gap.
 inline bool stream_scale_plan(uint32_t source_width, uint32_t source_height, uint32_t area_width,
                               uint32_t area_height, bool cover, StreamScalePlan &plan) {
   plan = {};
@@ -47,12 +50,19 @@ inline bool stream_scale_plan(uint32_t source_width, uint32_t source_height, uin
   }
   if (steps == 0) steps = 1;
   if (steps >= MAX_SCALE_STEPS) steps = MAX_SCALE_STEPS - 1;
-  uint32_t crop_width = source_width & ~15U;
-  uint32_t crop_height = source_height & ~15U;
-  const uint32_t max_width = (area_width * SCALE_FRACTION_STEPS / steps) & ~15U;
-  const uint32_t max_height = (area_height * SCALE_FRACTION_STEPS / steps) & ~15U;
-  if (crop_width > max_width) crop_width = max_width;
-  if (crop_height > max_height) crop_height = max_height;
+  // The source crop needed to reach `area` at this step: rounded down to whole
+  // blocks for fit, up for cover, then reduced until it fits the slack.
+  auto crop_for = [steps, cover](uint32_t source, uint32_t area) -> uint32_t {
+    uint32_t crop = source & ~15U;
+    uint32_t needed = cover ? ((area * SCALE_FRACTION_STEPS + steps - 1) / steps + 15) & ~15U
+                            : (area * SCALE_FRACTION_STEPS / steps) & ~15U;
+    if (cover) {
+      while (needed > 16 && needed * steps / SCALE_FRACTION_STEPS > area + STREAM_COVER_SLACK_PX) needed -= 16;
+    }
+    return crop < needed ? crop : needed;
+  };
+  const uint32_t crop_width = crop_for(source_width, area_width);
+  const uint32_t crop_height = crop_for(source_height, area_height);
   if (crop_width == 0 || crop_height == 0) return false;
   plan.steps = steps;
   plan.crop_width = crop_width;

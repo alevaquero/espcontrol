@@ -15,6 +15,7 @@
 
 #include "mjpeg_parser.h"
 #include "p4_jpeg_backend.h"
+#include "p4_scaling.h"
 
 namespace esphome {
 namespace artwork_image {
@@ -154,7 +155,8 @@ void free_buffers() {
 
 void stream_task(void *) {
   StreamState &s = state();
-  const size_t frame_bytes = static_cast<size_t>(s.area_width) * s.area_height * 2;
+  const size_t slack = s.cover ? p4::STREAM_COVER_SLACK_PX : 0;
+  const size_t frame_bytes = (s.area_width + slack) * (s.area_height + slack) * 2;
   const size_t capacity = (frame_bytes + 63) & ~static_cast<size_t>(63);
   lock();
   s.front = s.ready = -1;

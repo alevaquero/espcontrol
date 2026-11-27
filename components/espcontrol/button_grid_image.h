@@ -2475,8 +2475,6 @@ inline void image_card_live_show(ImageCardLiveUi &live, ImageCardCtx *ctx,
   dsc.data = frame.data;
   dsc.data_size = static_cast<uint32_t>(frame.width) * frame.height * 2;
   lv_image_set_src(live.widget, &dsc);
-  lv_obj_set_size(live.widget, frame.width, frame.height);
-  lv_obj_align(live.widget, LV_ALIGN_CENTER, 0, 0);
   if (live.showing) return;
   live.showing = true;
   lv_obj_clear_flag(live.widget, LV_OBJ_FLAG_HIDDEN);
@@ -2540,7 +2538,13 @@ inline void image_card_live_begin(ImageCardCtx *ctx) {
   lv_obj_clear_flag(live.widget, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_style_pad_all(live.widget, 0, LV_PART_MAIN);
   lv_obj_set_style_border_width(live.widget, 0, LV_PART_MAIN);
-  lv_obj_set_style_bg_opa(live.widget, LV_OPA_TRANSP, LV_PART_MAIN);
+  // The live layer covers the whole popup so the snapshot never shows around
+  // it: fit bars use the snapshot's bar colour, and cover overfill is trimmed.
+  lv_obj_set_pos(live.widget, 0, 0);
+  lv_obj_set_size(live.widget, lv_pct(100), lv_pct(100));
+  lv_image_set_inner_align(live.widget, LV_IMAGE_ALIGN_CENTER);
+  lv_obj_set_style_bg_color(live.widget, lv_color_hex(ctx->fit_background_color), LV_PART_MAIN);
+  lv_obj_set_style_bg_opa(live.widget, LV_OPA_COVER, LV_PART_MAIN);
   lv_obj_set_style_radius(live.widget, lv_obj_get_style_radius(ui.panel, LV_PART_MAIN), LV_PART_MAIN);
   lv_obj_set_style_clip_corner(live.widget, true, LV_PART_MAIN);
   lv_obj_add_flag(live.widget, LV_OBJ_FLAG_HIDDEN);

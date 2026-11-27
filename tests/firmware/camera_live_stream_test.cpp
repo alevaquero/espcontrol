@@ -115,11 +115,23 @@ void test_scale_plan() {
   assert(stream_scale_plan(1280, 720, 1280, 656, false, plan));
   assert(plan.steps == 14 && plan.out_width == 1120 && plan.out_height == 630);
   assert(plan.out_width <= 1280 && plan.out_height <= 656);
-  // A 1080p stream covering the popup scales down and never exceeds the area.
+  // Cover rounds up so the picture fills the area with no gap, within the slack.
+  using esphome::artwork_image::p4::STREAM_COVER_SLACK_PX;
   assert(stream_scale_plan(1920, 1080, 1280, 656, true, plan));
-  assert(plan.steps == 11 && plan.out_width <= 1280 && plan.out_height <= 656);
+  assert(plan.steps == 11 && plan.out_width >= 1280 && plan.out_height >= 656);
+  assert(plan.out_width <= 1280 + STREAM_COVER_SLACK_PX && plan.out_height <= 656 + STREAM_COVER_SLACK_PX);
   assert(plan.crop_width % 16 == 0 && plan.crop_height % 16 == 0);
   assert(plan.crop_width * plan.steps / 16 == plan.out_width);
+  // The portrait doorbell stream that left a gap around the live picture.
+  for (uint32_t width = 1200; width <= 1280; width += 2) {
+    for (uint32_t height = 640; height <= 720; height += 2) {
+      assert(stream_scale_plan(1280, 1707, width, height, true, plan));
+      assert(plan.out_width >= width && plan.out_height >= height);
+      assert(plan.out_width <= width + STREAM_COVER_SLACK_PX && plan.out_height <= height + STREAM_COVER_SLACK_PX);
+      assert(stream_scale_plan(1280, 1707, width, height, false, plan));
+      assert(plan.out_width <= width && plan.out_height <= height);
+    }
+  }
   // A small stream is enlarged.
   assert(stream_scale_plan(640, 360, 1280, 656, false, plan));
   assert(plan.steps == 29 && plan.out_width == 1160 && plan.out_height == 638);
