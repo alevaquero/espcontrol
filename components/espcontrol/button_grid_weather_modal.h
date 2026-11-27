@@ -181,8 +181,10 @@ inline void weather_daily_refresh_modal() {
     const auto &col = ui.columns[i];
     const int column_width = width + (static_cast<int>(i % 3) < remainder ? 1 : 0);
     const int left = std::max(ui.day_padding, (column_width - block_width) / 2);
+    // Only x moves: a new label's reported position is not valid until the
+    // next layout, so reading y back here would stack every line at the top.
     auto place = [&](lv_obj_t *label, int x) {
-      lv_obj_set_pos(label, x, lv_obj_get_y(label));
+      lv_obj_set_x(label, x);
       if (label != col.icon) lv_obj_set_width(label, std::max(0, column_width - ui.day_padding - x));
     };
     place(col.icon, left);

@@ -88,7 +88,7 @@ NOOP(lv_label_set_long_mode)
 void lv_obj_set_style_text_align(lv_obj_t *obj,int align,int){obj->text_align=align;}
 void lv_obj_set_pos(lv_obj_t *obj,int x,int y){obj->x=x;obj->y=y;}
 void lv_obj_set_y(lv_obj_t *obj,int y){obj->y=y;}
-int lv_obj_get_y(lv_obj_t *obj){return obj->y;}
+void lv_obj_set_x(lv_obj_t *obj,int x){obj->x=x;}
 void lv_obj_add_flag(lv_obj_t *obj,int flag){obj->flags|=flag;}
 void lv_obj_clear_flag(lv_obj_t *obj,int flag){obj->flags&=~flag;}
 void lv_obj_align(lv_obj_t *obj,int,int x,int y){obj->x=(obj->parent?obj->parent->width-obj->width:0)/2+x;obj->y=y;}
