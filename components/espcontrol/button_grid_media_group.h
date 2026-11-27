@@ -410,6 +410,16 @@ inline std::vector<int> media_group_delta_volumes(
   return out;
 }
 
+// A speaker joining a group keeps its own volume, which may be far louder than
+// the group (a speaker left at 100% blasted the room). It is set to the main
+// speaker's volume instead. Players without an absolute volume are left alone.
+inline bool media_group_join_volume(bool absolute_volume, bool primary_volume_known,
+                                    int primary_volume_pct, int *target_pct) {
+  if (!target_pct || !absolute_volume || !primary_volume_known) return false;
+  *target_pct = std::max(0, std::min(100, primary_volume_pct));
+  return true;
+}
+
 inline std::string media_group_members_json(const std::vector<std::string> &members) {
   std::string json = "[";
   bool first = true;

@@ -28,6 +28,7 @@ constexpr int LV_OBJ_FLAG_CLICKABLE = 1, LV_OBJ_FLAG_EVENT_BUBBLE = 2;
 constexpr int LV_PART_MAIN = 0, LV_OPA_COVER = 255, LV_EVENT_CLICKED = 1;
 constexpr int LV_OBJ_FLAG_HIDDEN = 4;
 #define ESP_LOGW(...) ((void)0)
+#define ESP_LOGI(...) ((void)0)
 namespace esphome {
 uint32_t now = 100;
 uint32_t millis() { return now; }
@@ -162,6 +163,7 @@ for text, name in (
     (group, "media_group_step_volume"),
     (group, "media_group_mean_volume"),
     (group, "media_group_delta_volumes"),
+    (group, "media_group_join_volume"),
     (media, "media_control_set_volume_value"),
     (media, "media_control_volume_pending_active"),
     (media, "media_control_store_group_volume"),
@@ -176,6 +178,7 @@ for text, name in (
     (media, "media_control_refresh_speakers"),
     (media, "media_control_apply_group_volume_percent"),
     (media, "media_control_speaker_action_timer_cb"),
+    (media, "media_control_match_joining_speaker_volume"),
     (media, "media_control_group_action_result"),
     (media, "media_control_create_speaker_volume_button"),
 ):
@@ -385,6 +388,37 @@ int main() {
   kitchen.call_id = 124; kitchen.pending = true;
   media_control_group_action_result(&ctx, kitchen.entity_id, 124, {true});
   assert(!ui.speaker_status_error && (status.flags & LV_OBJ_FLAG_HIDDEN));
+
+  // A joining speaker left at a high volume is set to the main speaker's
+  // volume, so it never blasts the room it joins from.
+  ctx.group_members = {};
+  ctx.current_pct = 30; ctx.volume_known = true;
+  kitchen.volume_pct = 100; kitchen.volume_known = true; kitchen.selected = true;
+  kitchen.call_id = 125; kitchen.pending = true;
+  commands.clear();
+  media_control_group_action_result(&ctx, kitchen.entity_id, 125, {true});
+  assert(commands.size() == 1 && commands[0].entity == kitchen.entity_id && commands[0].volume == 30);
+  assert(kitchen.volume_pct == 30 && kitchen.volume_known);
+  // Without a known main volume, or for step-only players, nothing is sent.
+  ctx.group_members = {};
+  ctx.volume_known = false;
+  kitchen.call_id = 126; kitchen.pending = true;
+  commands.clear();
+  media_control_group_action_result(&ctx, kitchen.entity_id, 126, {true});
+  assert(commands.empty());
+  ctx.group_members = {};
+  ctx.volume_known = true;
+  ctx.volume_control_mode = espcontrol::media::VolumeControlMode::RELATIVE;
+  kitchen.call_id = 127; kitchen.pending = true;
+  media_control_group_action_result(&ctx, kitchen.entity_id, 127, {true});
+  assert(commands.empty());
+  ctx.volume_control_mode = espcontrol::media::VolumeControlMode::ABSOLUTE;
+  // A failed join does not change the volume afterwards.
+  ctx.group_members = {};
+  kitchen.call_id = 128; kitchen.pending = true; kitchen.previous_selected = false;
+  media_control_group_action_result(&ctx, kitchen.entity_id, 128, {false});
+  assert(commands.empty());
+  media_control_set_speaker_status(nullptr);
 
   // The group minus button's requested mean must remain a one-point decrease,
   // including a group already above Maximum Volume.
