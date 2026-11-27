@@ -1,0 +1,20 @@
+{
+  "name": "Espcontrol",
+  "version": "v1.7.7",
+  "home_assistant_domain": "esphome",
+  "builds": [
+    {
+      "chipFamily": "ESP32-P4",
+      "parts": [
+        {
+          "path": "esp32-p4-wifi6-touch-lcd-5.factory.bin",
+          "offset": 0
+        }
+      ],
+      "ota": {
+        "path": "esp32-p4-wifi6-touch-lcd-5.ota.bin",
+        "md5": "7a238334dd5809ebb372b7fb13aa92e0"
+      }
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "device": "esp32-p4-wifi6-touch-lcd-5",
+  "versions": [
+    {
+      "version": "v1.7.7",
+      "release_url": "",
+      "ota": {
+        "path": "esp32-p4-wifi6-touch-lcd-5.ota.bin",
+        "md5": "7a238334dd5809ebb372b7fb13aa92e0"
+      }
+    }
+  ]
+}
