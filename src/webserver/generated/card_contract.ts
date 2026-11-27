@@ -4087,6 +4087,12 @@ export const CARD_CONTRACT_CARDS: Readonly<Record<string, CardTypeSpec>> = {
         "label": "Open on activity",
         "kind": "flag",
         "omitDefault": true
+      },
+      {
+        "name": "image_modal_live_url",
+        "label": "Live stream URL",
+        "kind": "text",
+        "omitDefault": true
       }
     ],
     "normalization": {
@@ -4133,7 +4139,8 @@ export const CARD_CONTRACT_CARDS: Readonly<Record<string, CardTypeSpec>> = {
         "image_modal_refresh_interval",
         "image_modal_refresh_trigger",
         "image_modal_activity_interval",
-        "image_modal_activity_open"
+        "image_modal_activity_open",
+        "image_modal_live_url"
       ],
       "optionHook": "normalize_image_options"
     },
@@ -5296,6 +5303,7 @@ export const CARD_CONTRACT_OPTION_NAMES: Readonly<Record<string, string>> = {
   "image_label": "image_label",
   "image_modal_activity_interval": "image_modal_activity_interval",
   "image_modal_activity_open": "image_modal_activity_open",
+  "image_modal_live_url": "image_modal_live_url",
   "image_modal_mode": "image_modal_mode",
   "image_modal_refresh_interval": "image_modal_refresh_interval",
   "image_modal_refresh_mode": "image_modal_refresh_mode",

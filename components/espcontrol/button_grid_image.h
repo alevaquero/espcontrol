@@ -13,6 +13,7 @@
 #include "artwork_controller.h"
 #include "cover_art.h"
 #include "../artwork_image/image_pipeline_policy.h"
+#include "../artwork_image/mjpeg_stream.h"
 #include <cstring>
 
 constexpr uint32_t IMAGE_CARD_STARTUP_RETRY_MS = 45000;
@@ -94,6 +95,7 @@ struct ImageCardCtx {
   espcontrol::camera::ImageRevision revision;
   std::string refresh_trigger_entity;
   bool open_on_activity = false;  // Open the expanded view when the trigger fires.
+  std::string live_url;  // MJPEG stream shown in the expanded view instead of snapshots.
   bool explicit_picture_refresh = false;
   uint32_t revision_retry_ms = 0;
   bool media_artwork = false;
@@ -392,6 +394,7 @@ inline void image_card_show_modal_image(
   esphome::artwork_image::ArtworkImage *image);
 inline bool image_card_queue_modal_source_request(ImageCardCtx *ctx);
 inline bool image_card_context_on_active_screen(ImageCardCtx *ctx);
+inline bool image_card_live_showing(ImageCardCtx *ctx);
 inline void image_card_schedule_source_refresh(ImageCardCtx *ctx, uint32_t delay_ms,
                                                const char *reason);
 
@@ -2285,6 +2288,11 @@ inline bool image_card_queue_modal_source_request(ImageCardCtx *ctx) {
     return false;
   }
   if (!image_card_context_on_active_screen(ctx) || !ha_api_state_connected()) return false;
+  // Live frames replace snapshot refreshes while they keep arriving.
+  if (image_card_live_showing(ctx)) {
+    ctx->refresh_schedule.finished(esphome::millis(), true);
+    return true;
+  }
   // The expanded view needs its own image and fit mode. A scheduled tile
   // download shares this refresh clock and would otherwise block that request,
   // leaving the already-cropped tile preview on screen indefinitely.
@@ -2398,6 +2406,178 @@ inline void image_card_hide_modal() {
   }
   image_card_schedule_modal_cleanup(ctx);
 }
+
+// Live MJPEG view in the expanded camera image. It sits above the snapshot;
+// when frames stop arriving it hides and the snapshot refreshes as before.
+#if defined(CONFIG_IDF_TARGET_ESP32P4) && ESPHOME_VERSION_CODE >= VERSION_CODE(2026, 4, 0)
+constexpr bool IMAGE_CARD_LIVE_SUPPORTED = true;
+#else
+constexpr bool IMAGE_CARD_LIVE_SUPPORTED = false;
+#endif
+constexpr uint32_t IMAGE_CARD_LIVE_TIMER_MS = 30;
+constexpr lv_coord_t IMAGE_CARD_LIVE_DOT_PX = 14;
+
+struct ImageCardLiveUi {
+  ImageCardCtx *ctx = nullptr;
+  lv_obj_t *widget = nullptr;
+  lv_timer_t *timer = nullptr;
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2026, 4, 0)
+  lv_image_dsc_t dsc[2] = {};
+#endif
+  uint8_t dsc_index = 0;
+  bool showing = false;
+  uint32_t window_end = 0;
+  espcontrol::camera::LiveSession session;
+};
+
+inline ImageCardLiveUi &image_card_live_ui() {
+  static ImageCardLiveUi ui;
+  return ui;
+}
+
+inline bool image_card_live_showing(ImageCardCtx *ctx) {
+  const ImageCardLiveUi &live = image_card_live_ui();
+  return ctx && live.ctx == ctx && live.showing;
+}
+
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2026, 4, 0)
+inline void image_card_live_hide(ImageCardLiveUi &live) {
+  live.showing = false;
+  if (!live.widget) return;
+  lv_image_set_src(live.widget, nullptr);
+  lv_obj_add_flag(live.widget, LV_OBJ_FLAG_HIDDEN);
+}
+
+// Stops the stream and removes the live picture. The widget is detached
+// before the stream task can release its frame buffers.
+inline void image_card_live_end() {
+  ImageCardLiveUi &live = image_card_live_ui();
+  lv_obj_t *widget = live.widget;
+  if (widget) lv_image_set_src(widget, nullptr);
+  if (live.timer) lv_timer_del(live.timer);
+  live = ImageCardLiveUi();
+  esphome::artwork_image::MjpegStream::instance().stop();
+  if (widget) lv_obj_del(widget);
+}
+
+inline void image_card_live_show(ImageCardLiveUi &live, ImageCardCtx *ctx,
+                                 const esphome::artwork_image::MjpegStreamFrame &frame) {
+  // Alternate descriptors so LVGL always sees a new source for a new frame.
+  live.dsc_index ^= 1;
+  lv_image_dsc_t &dsc = live.dsc[live.dsc_index];
+  lv_image_cache_drop(&dsc);
+  dsc = lv_image_dsc_t{};
+  dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
+  dsc.header.cf = LV_COLOR_FORMAT_RGB565;
+  dsc.header.w = frame.width;
+  dsc.header.h = frame.height;
+  dsc.header.stride = frame.width * 2;
+  dsc.data = frame.data;
+  dsc.data_size = static_cast<uint32_t>(frame.width) * frame.height * 2;
+  lv_image_set_src(live.widget, &dsc);
+  lv_obj_set_size(live.widget, frame.width, frame.height);
+  lv_obj_align(live.widget, LV_ALIGN_CENTER, 0, 0);
+  if (live.showing) return;
+  live.showing = true;
+  lv_obj_clear_flag(live.widget, LV_OBJ_FLAG_HIDDEN);
+  image_card_hide_modal_loading(ctx);
+  ImageCardModalUi &ui = image_card_modal_ui();
+  if (ui.back_btn) lv_obj_move_foreground(ui.back_btn);
+}
+
+inline void image_card_live_timer_cb(lv_timer_t *) {
+  ImageCardLiveUi &live = image_card_live_ui();
+  ImageCardCtx *ctx = live.ctx;
+  ImageCardModalUi &ui = image_card_modal_ui();
+  if (!ctx || !live.widget || !ui.panel || !image_card_modal_active_for(ctx)) {
+    image_card_live_end();
+    return;
+  }
+  auto &stream = esphome::artwork_image::MjpegStream::instance();
+  const uint32_t now = esphome::millis();
+  // Each new activity moves the refresh window; treat that as activity here too.
+  if (ctx->refresh_schedule.window && ctx->refresh_schedule.window_end != live.window_end) {
+    live.window_end = ctx->refresh_schedule.window_end;
+    live.session.activity(now);
+  }
+  const bool trigger_on = ctx->activity_trigger.on(ha_read_coordinator().connection_generation());
+  if (!live.session.allowed(now, trigger_on)) {
+    if (stream.active() || live.showing) {
+      ESP_LOGI("image_card", "Pausing live view for %s after 2 minutes without activity",
+               ctx->entity_id.c_str());
+      image_card_live_hide(live);
+      stream.stop();
+      image_card_queue_modal_source_request(ctx);
+    }
+    return;
+  }
+  if (!stream.active()) {
+    image_card_live_hide(live);
+    lv_coord_t width = lv_obj_get_width(ui.panel);
+    lv_coord_t height = lv_obj_get_height(ui.panel);
+    esphome::artwork_image::ArtworkImage *image =
+        image_card_has_separate_modal_image(ctx) ? ctx->modal_image : ctx->image;
+    // Returns false until a previous stream has shut down; the next tick retries.
+    stream.start(ctx->live_url, width, height, !ctx->modal_fit, image && image->is_big_endian());
+    return;
+  }
+  esphome::artwork_image::MjpegStreamFrame frame;
+  if (stream.take_frame(frame)) {
+    image_card_live_show(live, ctx, frame);
+  } else if (live.showing && !espcontrol::camera::live_frame_fresh(now, stream.last_frame_ms())) {
+    image_card_live_hide(live);  // Stalled: show the snapshot, which refreshes again.
+  }
+}
+
+inline void image_card_live_begin(ImageCardCtx *ctx) {
+  image_card_live_end();
+  ImageCardModalUi &ui = image_card_modal_ui();
+  if (!IMAGE_CARD_LIVE_SUPPORTED || !ctx || ctx->live_url.empty() || !ui.panel) return;
+  ImageCardLiveUi &live = image_card_live_ui();
+  live.widget = lv_image_create(ui.panel);
+  if (!live.widget) return;
+  lv_obj_clear_flag(live.widget, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_clear_flag(live.widget, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_style_pad_all(live.widget, 0, LV_PART_MAIN);
+  lv_obj_set_style_border_width(live.widget, 0, LV_PART_MAIN);
+  lv_obj_set_style_bg_opa(live.widget, LV_OPA_TRANSP, LV_PART_MAIN);
+  lv_obj_set_style_radius(live.widget, lv_obj_get_style_radius(ui.panel, LV_PART_MAIN), LV_PART_MAIN);
+  lv_obj_set_style_clip_corner(live.widget, true, LV_PART_MAIN);
+  lv_obj_add_flag(live.widget, LV_OBJ_FLAG_HIDDEN);
+  // Removing the popup deletes the widget; stop the stream with it.
+  lv_obj_add_event_cb(live.widget, [](lv_event_t *event) {
+    ImageCardLiveUi &current = image_card_live_ui();
+    if (current.widget != static_cast<lv_obj_t *>(lv_event_get_target(event))) return;
+    current.widget = nullptr;
+    image_card_live_end();
+  }, LV_EVENT_DELETE, nullptr);
+  // A red dot marks live video.
+  lv_obj_t *dot = lv_obj_create(live.widget);
+  if (dot) {
+    lv_obj_set_size(dot, IMAGE_CARD_LIVE_DOT_PX, IMAGE_CARD_LIVE_DOT_PX);
+    lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(dot, lv_color_hex(0xE53935), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_width(dot, 0, LV_PART_MAIN);
+    lv_obj_set_style_shadow_width(dot, 0, LV_PART_MAIN);
+    lv_obj_clear_flag(dot, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_clear_flag(dot, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_align(dot, LV_ALIGN_TOP_RIGHT, -2 * IMAGE_CARD_LIVE_DOT_PX, 2 * IMAGE_CARD_LIVE_DOT_PX);
+  }
+  live.ctx = ctx;
+  live.window_end = ctx->refresh_schedule.window_end;
+  live.session.begin(esphome::millis());
+  live.timer = lv_timer_create(image_card_live_timer_cb, IMAGE_CARD_LIVE_TIMER_MS, nullptr);
+  if (!live.timer) {
+    image_card_live_end();
+    return;
+  }
+  if (ui.loading_widget) lv_obj_move_foreground(ui.loading_widget);
+  ESP_LOGI("image_card", "Live view enabled for %s", ctx->entity_id.c_str());
+}
+#else
+inline void image_card_live_begin(ImageCardCtx *) {}
+#endif
 
 inline bool image_card_can_open_modal(ImageCardCtx *ctx) {
   return ctx && ctx->active && ctx->image &&
@@ -2520,6 +2700,7 @@ inline void image_card_open_modal(ImageCardCtx *ctx) {
   }
   if (ctx->camera_entity_unavailable || ctx->camera_download_errors != 0)
     image_card_show_camera_unavailable(ctx);
+  image_card_live_begin(ctx);
   lv_obj_move_foreground(ui.back_btn);
   lv_obj_move_foreground(ui.overlay);
 }
@@ -3310,6 +3491,7 @@ inline bool image_card_bind_runtime(BtnSlot &s, const ParsedCfg &p,
   ctx->activity_trigger = {};
   ctx->refresh_trigger_entity.clear();
   ctx->open_on_activity = false;
+  ctx->live_url.clear();
   if (p.entity.rfind("camera.", 0) == 0) {
     ctx->refresh_schedule.mode = espcontrol::camera::refresh_mode(
         cfg_option_value(p.options, "image_modal_refresh_mode"));
@@ -3325,6 +3507,8 @@ inline bool image_card_bind_runtime(BtnSlot &s, const ParsedCfg &p,
     ctx->open_on_activity =
         ctx->refresh_schedule.mode == espcontrol::camera::RefreshMode::ACTIVITY &&
         cfg_option_token_present(p.options, IMAGE_MODAL_ACTIVITY_OPEN_OPTION);
+    const std::string live_url = cfg_option_value(p.options, IMAGE_MODAL_LIVE_URL_OPTION);
+    if (espcontrol::camera::valid_live_url(live_url)) ctx->live_url = live_url;
   }
   ctx->media_artwork = false;
   ctx->media_artwork_suppressed = false;

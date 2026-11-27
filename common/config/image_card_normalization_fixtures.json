@@ -268,5 +268,65 @@
       "precision": "",
       "options": ""
     }
+  },
+  {
+    "name": "live url is kept for cameras",
+    "input": "camera.front_door;;Auto;Auto;;;image;;image_modal_live_url=http%3A//192.168.1.128%3A1984/api/stream.mjpeg?src=g6_entry_mjpeg",
+    "expected": {
+      "entity": "camera.front_door",
+      "label": "",
+      "icon": "Auto",
+      "icon_on": "Auto",
+      "sensor": "",
+      "unit": "",
+      "type": "image",
+      "precision": "",
+      "options": "image_modal_live_url=http%3A//192.168.1.128%3A1984/api/stream.mjpeg?src=g6_entry_mjpeg"
+    }
+  },
+  {
+    "name": "live url follows activity settings",
+    "input": "camera.front_door;;Auto;Auto;;;image;;image_modal_live_url=http%3A//192.168.1.128%3A1984/api/stream.mjpeg?src=g6_entry_mjpeg,image_modal_refresh_mode=activity,image_modal_refresh_trigger=event.doorbell",
+    "expected": {
+      "entity": "camera.front_door",
+      "label": "",
+      "icon": "Auto",
+      "icon_on": "Auto",
+      "sensor": "",
+      "unit": "",
+      "type": "image",
+      "precision": "",
+      "options": "image_modal_refresh_mode=activity,image_modal_refresh_trigger=event.doorbell,image_modal_live_url=http%3A//192.168.1.128%3A1984/api/stream.mjpeg?src=g6_entry_mjpeg"
+    }
+  },
+  {
+    "name": "live url must use http",
+    "input": "camera.front_door;;Auto;Auto;;;image;;image_modal_live_url=https%3A//192.168.1.128/stream",
+    "expected": {
+      "entity": "camera.front_door",
+      "label": "",
+      "icon": "Auto",
+      "icon_on": "Auto",
+      "sensor": "",
+      "unit": "",
+      "type": "image",
+      "precision": "",
+      "options": ""
+    }
+  },
+  {
+    "name": "image entity ignores live url",
+    "input": "image.front_door;;Auto;Auto;;;image;;image_modal_live_url=http%3A//192.168.1.128%3A1984/api/stream.mjpeg?src=g6_entry_mjpeg",
+    "expected": {
+      "entity": "image.front_door",
+      "label": "",
+      "icon": "Auto",
+      "icon_on": "Auto",
+      "sensor": "",
+      "unit": "",
+      "type": "image",
+      "precision": "",
+      "options": ""
+    }
   }
 ]

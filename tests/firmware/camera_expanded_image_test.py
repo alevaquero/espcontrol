@@ -73,6 +73,8 @@ bool image_card_pipeline_suspended() { return false; }
 bool image_card_modal_refresh_supported() { return true; }
 bool image_card_context_on_active_screen(ImageCardCtx *) { return true; }
 bool ha_api_state_connected() { return true; }
+bool live_showing = false;
+bool image_card_live_showing(ImageCardCtx *) { return live_showing; }
 bool image_card_memory_available(ImageCardCtx *, const char *, int, int) { return true; }
 bool image_card_modal_has_preview(ImageCardCtx *) { return true; }
 void image_card_show_modal_loading(ImageCardCtx *, const char *) {}
@@ -140,6 +142,13 @@ int main() {
    assert(ctx.refresh_schedule.in_flight);
    assert(image_card_queue_modal_source_request(&ctx));
    assert(ui.request_timer == nullptr && expanded.requests == 1);
+   // While live frames arrive, a due refresh completes without a snapshot.
+   ctx.refresh_schedule.finished(esphome::millis(), true);
+   live_showing = true;
+   assert(image_card_queue_modal_source_request(&ctx));
+   assert(ui.request_timer == nullptr && expanded.requests == 1);
+   assert(!ctx.refresh_schedule.in_flight && ctx.refresh_schedule.completed);
+   live_showing = false;
   }
  }
 }

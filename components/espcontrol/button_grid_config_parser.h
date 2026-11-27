@@ -44,6 +44,7 @@ constexpr const char *SENSOR_TIME_UNIT_OPTION = card_runtime_option_name_time_un
 constexpr const char *IMAGE_LABEL_OPTION = card_runtime_option_name_image_label();
 constexpr const char *IMAGE_MODAL_ACTIVITY_OPEN_OPTION = "image_modal_activity_open";
 constexpr const char *IMAGE_MODAL_ACTIVITY_INTERVAL_OPTION = "image_modal_activity_interval";
+constexpr const char *IMAGE_MODAL_LIVE_URL_OPTION = "image_modal_live_url";
 constexpr const char *IMAGE_ICON_OPTION = card_runtime_option_name_image_icon();
 constexpr const char *IMAGE_MODAL_MODE_OPTION = card_runtime_option_name_image_modal_mode();
 constexpr const char *MEDIA_COVER_ART_OPTION = card_runtime_option_name_media_cover_art();
@@ -605,6 +606,9 @@ inline std::string image_card_options_normalized(const std::string &options,
         out += IMAGE_MODAL_ACTIVITY_OPEN_OPTION;
       }
     }
+    const std::string live_url = cfg_option_value(options, IMAGE_MODAL_LIVE_URL_OPTION);
+    if (espcontrol::camera::valid_live_url(live_url))
+      append(IMAGE_MODAL_LIVE_URL_OPTION, encode_compact_field(live_url));
   }
   return out;
 }
